@@ -33,11 +33,12 @@ class LegalDocument extends Model
     ];
 
     /** Per-row "kind" — distinguishes regular documents from specialized types that get AI analysis. */
-    public const KIND_DOCUMENT      = 'document';
-    public const KIND_CONTRACT      = 'contract';
-    public const KIND_CASE          = 'case';
+    public const KIND_DOCUMENT       = 'document';
+    public const KIND_CONTRACT       = 'contract';
+    public const KIND_CASE           = 'case';
     public const KIND_CONTRACT_REVIEW = 'contract_review';
-    public const KIND_MEMO          = 'memo';
+    public const KIND_MEMO           = 'memo';
+    public const KIND_TENDER_REVIEW  = 'tender_review';
 
     public const KINDS = [
         self::KIND_DOCUMENT        => 'مستند قانوني',
@@ -45,6 +46,7 @@ class LegalDocument extends Model
         self::KIND_CASE            => 'قضية',
         self::KIND_CONTRACT_REVIEW => 'مراجعة عقد',
         self::KIND_MEMO            => 'مسودة مذكرة',
+        self::KIND_TENDER_REVIEW   => 'مراجعة كراسة',
     ];
 
     /** Allowed relation_type values for the document_relations pivot table. */

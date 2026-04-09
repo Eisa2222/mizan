@@ -6,6 +6,7 @@ use App\Http\Controllers\ArticleUpdateController;
 use App\Http\Controllers\AssistantController;
 use App\Http\Controllers\ContractReviewController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\TenderReviewController;
 use App\Http\Controllers\DiscussionController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\MemoController;
@@ -47,6 +48,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/memos/create', [MemoController::class, 'create'])->name('memos.create');
     Route::post('/memos', [MemoController::class, 'store'])->name('memos.store');
     Route::get('/memos/{document}', [MemoController::class, 'show'])->name('memos.show');
+
+    // Tender Reviews (كراسات الشروط والمواصفات)
+    Route::get('/tender-reviews', [TenderReviewController::class, 'index'])->name('tender-reviews.index');
+    Route::get('/tender-reviews/create', [TenderReviewController::class, 'create'])->name('tender-reviews.create');
+    Route::post('/tender-reviews', [TenderReviewController::class, 'store'])->name('tender-reviews.store');
+    Route::get('/tender-reviews/{document}', [TenderReviewController::class, 'show'])->name('tender-reviews.show');
 
     // Documents
     Route::get('/documents', [DocumentController::class, 'index'])->name('documents.index');
