@@ -143,6 +143,12 @@ class ClaudeService
             ],
         ];
 
+        // If the system prompt asks for JSON, enable Ollama's native JSON mode
+        // which constrains the output to valid JSON tokens.
+        if ($system && (str_contains($system, 'JSON') || str_contains($system, 'json'))) {
+            $payload['format'] = 'json';
+        }
+
         try {
             $response = Http::timeout(180)
                 ->post($baseUrl . '/api/chat', $payload);

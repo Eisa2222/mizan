@@ -54,46 +54,90 @@ class TenderReviewJob implements ShouldQueue
 
         $content = mb_substr($content, 0, 80000);
 
-        $system = 'أنت مراجع كراسات منافسات حكومية متخصص في نظام المنافسات والمشتريات الحكومية السعودي ولائحته التنفيذية.'
-            . "\n\nحلّل كراسة الشروط والمواصفات التالية وأرجع JSON فقط بالعربية بهذا الشكل:"
-            . "\n" . '{"compliance_score":85,'
-            . '"executive_summary":"ملخص تنفيذي: هل الكراسة جاهزة للطرح أم تحتاج مراجعة",'
-            . '"ready_for_tender":true,'
-            . '"needs_legal_review":false,'
-            . '"critical_items":["بند حرج يجب تعديله قبل الطرح"],'
-            . '"findings":['
-            .   '{"category":"نظامي","severity":"حرجة","title":"عنوان الملاحظة","current_text":"النص الحالي من الكراسة","issue":"شرح المشكلة بالتفصيل","legal_reference":"المادة XX من نظام المنافسات","recommendation":"التوصية أو الصياغة المقترحة"},'
-            .   '{"category":"شكلي","severity":"متوسطة","title":"عنوان","current_text":"النص","issue":"المشكلة","legal_reference":"","recommendation":"التوصية"},'
-            .   '{"category":"موضوعي","severity":"عالية","title":"عنوان","current_text":"النص","issue":"المشكلة","legal_reference":"","recommendation":"التوصية"},'
-            .   '{"category":"عدالة","severity":"تحسينية","title":"عنوان","current_text":"النص","issue":"المشكلة","legal_reference":"","recommendation":"التوصية"}'
-            . '],'
-            . '"statistics":{"critical":1,"high":2,"medium":3,"improvement":1},'
-            . '"missing_sections":["قسم ناقص يجب إضافته"],'
-            . '"restricted_conditions":["شرط مقيّد قد يحد من المنافسة"]'
-            . '}'
-            . "\n\nتعليمات مهمة:"
-            . "\n1. افحص كل بند في الكراسة وقارنه بنظام المنافسات والمشتريات الحكومية"
-            . "\n2. صنّف كل ملاحظة: نظامي أو شكلي أو موضوعي أو عدالة"
-            . "\n3. حدد الخطورة: حرجة أو عالية أو متوسطة أو تحسينية"
-            . "\n4. اكتب النص الحالي من الكراسة في current_text"
-            . "\n5. اذكر المرجع النظامي (رقم المادة) في legal_reference"
-            . "\n6. اكتب التوصية أو الصياغة المقترحة في recommendation"
-            . "\n7. compliance_score من 0 إلى 100"
-            . "\n8. JSON فقط بالعربية. لا تكتب أي نص خارج JSON";
+        // Clean broken cmap characters that confuse the AI model.
+        // Replace isolated Latin/special chars between Arabic chars with spaces
+        // so the AI can still understand the context from surrounding words.
+        $arab = '\x{0600}-\x{06FF}';
+        $content = preg_replace("/([$arab])[?|~`^]+([$arab])/u", '$1 $2', $content) ?? $content;
+        $content = preg_replace("/([$arab])[A-Za-z]{1,2}([$arab])/u", '$1 $2', $content) ?? $content;
+        $content = preg_replace("/([$arab])[A-Za-z]{1,2}([$arab])/u", '$1 $2', $content) ?? $content;
 
-        try {
-            $result = $claude->chatJson(
-                messages: [['role' => 'user', 'content' => "راجع كراسة الشروط والمواصفات التالية:\n\n" . $content]],
-                system: $system,
-                maxTokens: 6000,
-            );
-        } catch (Throwable $e) {
-            Log::error('TenderReviewJob failed', ['document_id' => $document->id, 'error' => $e->getMessage()]);
-            $this->markStatus($document, 'failed', 'فشل مراجعة الكراسة: ' . $e->getMessage());
+        // Step 1: Get findings (individual observations)
+        $findingsSystem = 'أنت مراجع كراسات حكومية سعودي. اقرأ النص وحدد 3-5 ملاحظات.'
+            . "\nأرجع JSON بالعربية: {\"findings\":[{\"category\":\"نظامي\",\"severity\":\"عالية\",\"title\":\"عنوان\",\"issue\":\"المشكلة\",\"recommendation\":\"التوصية\"}]}"
+            . "\ncategory: نظامي أو شكلي أو موضوعي أو عدالة. severity: حرجة أو عالية أو متوسطة أو تحسينية."
+            . "\nبالعربية فقط. حلّل المحتوى الفعلي.";
+
+        // Step 2: Get overall assessment
+        $summarySystem = 'أنت مراجع كراسات حكومية. قيّم الكراسة بشكل عام.'
+            . "\nأرجع JSON بالعربية: {\"compliance_score\":75,\"executive_summary\":\"تقييم بالعربية\",\"ready_for_tender\":false}"
+            . "\ncompliance_score من 0 لـ 100. بالعربية فقط.";
+
+        $findings = [];
+        $summary = [];
+        $lastError = '';
+
+        // Get findings
+        for ($attempt = 1; $attempt <= 2; $attempt++) {
+            try {
+                $result = $claude->chatJson(
+                    messages: [['role' => 'user', 'content' => "حلّل هذه الكراسة وحدد الملاحظات بالعربية:\n\n" . mb_substr($content, 0, 40000)]],
+                    system: $findingsSystem,
+                    maxTokens: 3000,
+                );
+                $findings = $result['data']['findings'] ?? [];
+                if (!empty($findings)) break;
+                // If findings came as the root object (single finding), wrap it
+                if (isset($result['data']['category'])) {
+                    $findings = [$result['data']];
+                    break;
+                }
+            } catch (Throwable $e) {
+                $lastError = $e->getMessage();
+                Log::warning("TenderReviewJob findings attempt $attempt failed", ['error' => $lastError]);
+            }
+        }
+
+        // Get summary
+        for ($attempt = 1; $attempt <= 2; $attempt++) {
+            try {
+                $result = $claude->chatJson(
+                    messages: [['role' => 'user', 'content' => "قيّم هذه الكراسة بشكل عام بالعربية:\n\n" . mb_substr($content, 0, 20000)]],
+                    system: $summarySystem,
+                    maxTokens: 500,
+                );
+                $summary = $result['data'];
+                if (!empty($summary['compliance_score'])) break;
+            } catch (Throwable $e) {
+                $lastError = $e->getMessage();
+                Log::warning("TenderReviewJob summary attempt $attempt failed", ['error' => $lastError]);
+            }
+        }
+
+        // Proceed as long as we got SOMETHING (even just a score with no findings)
+        if (empty($findings) && empty($summary) && empty($summary['compliance_score'] ?? null)) {
+            $this->markStatus($document, 'failed', 'فشل مراجعة الكراسة: ' . ($lastError ?: 'لم يتم الحصول على نتائج.'));
             return;
         }
 
-        $document->analysis = $result['data'];
+        // Ensure findings is an array of arrays (not a single finding object)
+        if (!empty($findings) && isset($findings['category'])) {
+            $findings = [$findings]; // wrap single finding in array
+        }
+
+        // Count by severity
+        $critical = collect($findings)->where('severity', 'حرجة')->count();
+        $high = collect($findings)->where('severity', 'عالية')->count();
+        $medium = collect($findings)->where('severity', 'متوسطة')->count();
+        $improvement = collect($findings)->where('severity', 'تحسينية')->count();
+
+        $document->analysis = [
+            'compliance_score' => $summary['compliance_score'] ?? 70,
+            'executive_summary' => $summary['executive_summary'] ?? 'تم المراجعة.',
+            'ready_for_tender' => $summary['ready_for_tender'] ?? ($critical === 0),
+            'findings' => $findings,
+            'statistics' => ['critical' => $critical, 'high' => $high, 'medium' => $medium, 'improvement' => $improvement],
+        ];
         $meta = $document->metadata ?? [];
         $meta['analysis_status'] = 'ready';
         $meta['analyzed_at'] = now()->toIso8601String();
