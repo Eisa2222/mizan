@@ -62,15 +62,34 @@ class TenderReviewJob implements ShouldQueue
         $content = preg_replace("/([$arab])[A-Za-z]{1,2}([$arab])/u", '$1 $2', $content) ?? $content;
         $content = preg_replace("/([$arab])[A-Za-z]{1,2}([$arab])/u", '$1 $2', $content) ?? $content;
 
+        // ═══ System Prompt: متخصص في نظام المنافسات والمشتريات الحكومية ═══
+        $legalContext = 'أنت مساعد قانوني متخصص في نظام المنافسات والمشتريات الحكومية السعودي.'
+            . "\nاعتمد فقط على النصوص الرسمية من: النظام، اللائحة التنفيذية، الأدلة الإجرائية الرسمية، النماذج والعقود المعتمدة."
+            . "\n\nقواعدك:"
+            . "\n1) لا تجب بلا سند نظامي أو إجرائي."
+            . "\n2) كل ملاحظة يجب أن تتضمن المرجع النظامي أو الإجرائي (رقم المادة أو البند)."
+            . "\n3) ميّز بين المخالفة المؤكدة ومؤشر الخطر."
+            . "\n4) استخرج البنود، افحص الاكتمال والاتساق، حدّد المخاطر."
+            . "\n5) إذا لم تجد سنداً واضحاً، اكتب: \"لم أجد مرجعاً نظامياً صريحاً في المصادر المفهرسة.\""
+            . "\n6) اكتب بالعربية المهنية الواضحة فقط.";
+
         // Step 1: Get findings (individual observations)
-        $findingsSystem = 'أنت مراجع كراسات حكومية سعودي. اقرأ النص وحدد 3-5 ملاحظات.'
-            . "\nأرجع JSON بالعربية: {\"findings\":[{\"category\":\"نظامي\",\"severity\":\"عالية\",\"title\":\"عنوان\",\"issue\":\"المشكلة\",\"recommendation\":\"التوصية\"}]}"
-            . "\ncategory: نظامي أو شكلي أو موضوعي أو عدالة. severity: حرجة أو عالية أو متوسطة أو تحسينية."
-            . "\nبالعربية فقط. حلّل المحتوى الفعلي.";
+        $findingsSystem = $legalContext
+            . "\n\nراجع كراسة الشروط والمواصفات وأرجع JSON فقط بالعربية بالشكل:"
+            . "\n{\"findings\":[{\"category\":\"نظامي\",\"severity\":\"عالية\",\"title\":\"عنوان الملاحظة\","
+            . "\"issue\":\"وصف المشكلة مع ذكر البند المخالف من الكراسة\","
+            . "\"legal_reference\":\"المادة XX من نظام المنافسات أو اللائحة التنفيذية\","
+            . "\"violation_type\":\"مخالفة مؤكدة أو مؤشر خطر\","
+            . "\"recommendation\":\"التوصية والصياغة المقترحة بالتفصيل\"}]}"
+            . "\ncategory: نظامي أو شكلي أو موضوعي أو عدالة"
+            . "\nseverity: حرجة أو عالية أو متوسطة أو تحسينية"
+            . "\nحلّل المحتوى الفعلي. اذكر المرجع النظامي لكل ملاحظة.";
 
         // Step 2: Get overall assessment
-        $summarySystem = 'أنت مراجع كراسات حكومية. قيّم الكراسة بشكل عام.'
-            . "\nأرجع JSON بالعربية: {\"compliance_score\":75,\"executive_summary\":\"تقييم بالعربية\",\"ready_for_tender\":false}"
+        $summarySystem = $legalContext
+            . "\n\nقيّم الكراسة بشكل عام وأرجع JSON بالعربية:"
+            . "\n{\"compliance_score\":75,\"executive_summary\":\"هل الكراسة جاهزة للطرح؟ وما البنود الحرجة قبل الاعتماد؟ مع المراجع النظامية.\","
+            . "\"ready_for_tender\":false,\"needs_legal_review\":true}"
             . "\ncompliance_score من 0 لـ 100. بالعربية فقط.";
 
         $findings = [];
@@ -82,8 +101,13 @@ class TenderReviewJob implements ShouldQueue
         for ($attempt = 1; $attempt <= 2; $attempt++) {
             try {
                 $raw = $claude->chat(
-                    messages: [['role' => 'user', 'content' => "حلّل هذه الكراسة وأعطني 3 ملاحظات. أرجع JSON فقط:\n{\"findings\":[{\"category\":\"نظامي\",\"severity\":\"عالية\",\"title\":\"عنوان\",\"issue\":\"المشكلة\",\"recommendation\":\"التوصية\"}]}\n\nالكراسة:\n" . mb_substr($content, 0, 5000)]],
-                    system: "أرجع JSON بالعربية فقط. حلّل المحتوى الفعلي.",
+                    messages: [['role' => 'user', 'content' => "راجع كراسة الشروط والمواصفات التالية مقابل نظام المنافسات والمشتريات الحكومية ولائحته التنفيذية."
+                        . "\nاستخرج البنود، افحص الاكتمال والاتساق، حدّد المخاطر، وصنّفها."
+                        . "\nلكل ملاحظة اذكر: المرجع النظامي، نوع المخالفة (مؤكدة أو مؤشر خطر)، والتوصية."
+                        . "\nأرجع JSON فقط بالشكل:"
+                        . "\n{\"findings\":[{\"category\":\"نظامي\",\"severity\":\"عالية\",\"title\":\"عنوان\",\"issue\":\"المشكلة\",\"legal_reference\":\"المادة XX\",\"violation_type\":\"مخالفة مؤكدة\",\"recommendation\":\"التوصية\"}]}"
+                        . "\n\nالكراسة:\n" . mb_substr($content, 0, 8000)]],
+                    system: $findingsSystem,
                     maxTokens: 3000,
                 );
                 $text = $raw['text'];
@@ -107,7 +131,10 @@ class TenderReviewJob implements ShouldQueue
         for ($attempt = 1; $attempt <= 2; $attempt++) {
             try {
                 $raw = $claude->chat(
-                    messages: [['role' => 'user', 'content' => "قيّم هذه الكراسة بشكل عام. أرجع JSON فقط:\n{\"compliance_score\":75,\"executive_summary\":\"التقييم\",\"ready_for_tender\":false}\n\nالكراسة:\n" . mb_substr($content, 0, 20000)]],
+                    messages: [['role' => 'user', 'content' => "قيّم هذه الكراسة بشكل عام مقابل نظام المنافسات والمشتريات الحكومية."
+                        . "\nهل الكراسة جاهزة للطرح؟ هل تحتاج مراجعة قانونية؟ ما البنود الحرجة قبل الاعتماد؟"
+                        . "\nأرجع JSON فقط: {\"compliance_score\":75,\"executive_summary\":\"التقييم مع المراجع النظامية\",\"ready_for_tender\":false,\"needs_legal_review\":true}"
+                        . "\n\nالكراسة:\n" . mb_substr($content, 0, 8000)]],
                     system: $summarySystem,
                     maxTokens: 500,
                 );

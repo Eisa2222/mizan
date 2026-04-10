@@ -146,9 +146,17 @@
 
                             <div style="font-size:12px;color:var(--cream);line-height:1.7;margin-bottom:8px">{{ $f['issue'] ?? '' }}</div>
 
-                            @if (!empty($f['legal_reference']))
-                                <div style="font-size:11px;color:var(--gold);margin-bottom:6px">📜 {{ $f['legal_reference'] }}</div>
-                            @endif
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+                                @if (!empty($f['legal_reference']))
+                                    <div style="font-size:11px;color:var(--gold)">📜 {{ $f['legal_reference'] }}</div>
+                                @endif
+                                @if (!empty($f['violation_type']))
+                                    @php $vColor = str_contains($f['violation_type'], 'مؤكدة') ? '#e05555' : '#c8a94b'; @endphp
+                                    <div style="font-size:10px;padding:2px 8px;border-radius:6px;background:rgba(0,0,0,.2);color:{{ $vColor }};font-weight:700">
+                                        {{ $f['violation_type'] }}
+                                    </div>
+                                @endif
+                            </div>
 
                             @if (!empty($f['recommendation']))
                                 <div style="font-size:12px;color:#3dbf8a;background:rgba(61,191,138,.06);padding:8px 10px;border-radius:6px;line-height:1.6">
