@@ -10,7 +10,9 @@
         "elasticsearch/elasticsearch": "^8.0",
         "laravel/framework": "^13.0",
         "laravel/tinker": "^3.0",
+        "phpoffice/phpword": "^1.4",
         "smalot/pdfparser": "^2.12",
+        "spatie/browsershot": "^5.2",
         "thiagoalessio/tesseract_ocr": "^2.13"
     },
     "require-dev": {

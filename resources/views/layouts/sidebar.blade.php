@@ -31,6 +31,9 @@
     <a href="{{ route('tender-reviews.index') }}" class="mz-nav-item {{ request()->routeIs('tender-reviews.*') ? 'active' : '' }}">
         <span class="mz-ni">📋</span> مراجعة الكراسات
     </a>
+    <a href="{{ route('tenders.index') }}" class="mz-nav-item {{ request()->routeIs('tenders.*') ? 'active' : '' }}">
+        <span class="mz-ni">✨</span> توليد كراسة ذكي
+    </a>
     <a href="{{ route('memos.index') }}" class="mz-nav-item {{ request()->routeIs('memos.*') ? 'active' : '' }}">
         <span class="mz-ni">📄</span> مسودات المذكرات
     </a>

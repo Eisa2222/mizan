@@ -16,6 +16,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RelationController;
 use App\Http\Controllers\SearchPageController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\TenderController;
 use App\Http\Controllers\VersionController;
 use App\Http\Controllers\WatchlistController;
 use Illuminate\Support\Facades\Route;
@@ -48,6 +49,18 @@ Route::middleware('auth')->group(function () {
     Route::get('/memos/create', [MemoController::class, 'create'])->name('memos.create');
     Route::post('/memos', [MemoController::class, 'store'])->name('memos.store');
     Route::get('/memos/{document}', [MemoController::class, 'show'])->name('memos.show');
+
+    // Smart Tender Generator (مولّد الكراسات الذكي)
+    Route::get('/tenders', [TenderController::class, 'index'])->name('tenders.index');
+    Route::get('/tenders/create', [TenderController::class, 'create'])->name('tenders.create');
+    Route::post('/tenders', [TenderController::class, 'store'])->name('tenders.store');
+    Route::get('/tenders/{tender}', [TenderController::class, 'show'])->name('tenders.show');
+    Route::patch('/tenders/{tender}/sections/{sectionId}', [TenderController::class, 'updateSection'])->name('tenders.updateSection');
+    Route::post('/tenders/{tender}/regenerate', [TenderController::class, 'regenerate'])->name('tenders.regenerate');
+    Route::post('/tenders/{tender}/review', [TenderController::class, 'review'])->name('tenders.review');
+    Route::get('/tenders/{tender}/export/pdf', [TenderController::class, 'exportPdf'])->name('tenders.export.pdf');
+    Route::get('/tenders/{tender}/export/docx', [TenderController::class, 'exportDocx'])->name('tenders.export.docx');
+    Route::delete('/tenders/{tender}', [TenderController::class, 'destroy'])->name('tenders.destroy');
 
     // Tender Reviews (كراسات الشروط والمواصفات)
     Route::get('/tender-reviews', [TenderReviewController::class, 'index'])->name('tender-reviews.index');
