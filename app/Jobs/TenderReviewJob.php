@@ -77,20 +77,25 @@ class TenderReviewJob implements ShouldQueue
         $summary = [];
         $lastError = '';
 
-        // Get findings
+        // Get findings — use chat() then extract JSON manually.
+        // chatJson() forces Ollama JSON mode which oversimplifies responses.
         for ($attempt = 1; $attempt <= 2; $attempt++) {
             try {
-                $result = $claude->chatJson(
-                    messages: [['role' => 'user', 'content' => "حلّل هذه الكراسة وحدد الملاحظات بالعربية:\n\n" . mb_substr($content, 0, 40000)]],
-                    system: $findingsSystem,
+                $raw = $claude->chat(
+                    messages: [['role' => 'user', 'content' => "حلّل هذه الكراسة وأعطني 3 ملاحظات. أرجع JSON فقط:\n{\"findings\":[{\"category\":\"نظامي\",\"severity\":\"عالية\",\"title\":\"عنوان\",\"issue\":\"المشكلة\",\"recommendation\":\"التوصية\"}]}\n\nالكراسة:\n" . mb_substr($content, 0, 5000)]],
+                    system: "أرجع JSON بالعربية فقط. حلّل المحتوى الفعلي.",
                     maxTokens: 3000,
                 );
-                $findings = $result['data']['findings'] ?? [];
-                if (!empty($findings)) break;
-                // If findings came as the root object (single finding), wrap it
-                if (isset($result['data']['category'])) {
-                    $findings = [$result['data']];
-                    break;
+                $text = $raw['text'];
+                Log::info("TenderReviewJob findings raw", ['text_len' => mb_strlen($text), 'preview' => mb_substr($text, 0, 200)]);
+                // Extract JSON from response
+                if (preg_match('/\{[\s\S]*\}/u', $text, $m)) {
+                    $decoded = json_decode($m[0], true);
+                    if (is_array($decoded)) {
+                        $findings = $decoded['findings'] ?? [];
+                        if (isset($decoded['category'])) $findings = [$decoded];
+                        if (!empty($findings)) break;
+                    }
                 }
             } catch (Throwable $e) {
                 $lastError = $e->getMessage();
@@ -98,16 +103,21 @@ class TenderReviewJob implements ShouldQueue
             }
         }
 
-        // Get summary
+        // Get summary — also use chat() to avoid JSON mode issues
         for ($attempt = 1; $attempt <= 2; $attempt++) {
             try {
-                $result = $claude->chatJson(
-                    messages: [['role' => 'user', 'content' => "قيّم هذه الكراسة بشكل عام بالعربية:\n\n" . mb_substr($content, 0, 20000)]],
+                $raw = $claude->chat(
+                    messages: [['role' => 'user', 'content' => "قيّم هذه الكراسة بشكل عام. أرجع JSON فقط:\n{\"compliance_score\":75,\"executive_summary\":\"التقييم\",\"ready_for_tender\":false}\n\nالكراسة:\n" . mb_substr($content, 0, 20000)]],
                     system: $summarySystem,
                     maxTokens: 500,
                 );
-                $summary = $result['data'];
-                if (!empty($summary['compliance_score'])) break;
+                if (preg_match('/\{[\s\S]*\}/u', $raw['text'], $m)) {
+                    $decoded = json_decode($m[0], true);
+                    if (is_array($decoded) && isset($decoded['compliance_score'])) {
+                        $summary = $decoded;
+                        break;
+                    }
+                }
             } catch (Throwable $e) {
                 $lastError = $e->getMessage();
                 Log::warning("TenderReviewJob summary attempt $attempt failed", ['error' => $lastError]);
