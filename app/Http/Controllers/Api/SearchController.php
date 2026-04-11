@@ -154,7 +154,9 @@ class SearchController extends Controller
     private function makeSnippet(string $content, string $needle, int $window = 200): string
     {
         if ($needle === '') return mb_substr($content, 0, $window);
-        $pos = mb_stripos($content, mb_strtok($needle, ' '));
+        // Take the first whitespace-delimited token (mb-safe).
+        $firstToken = preg_split('/\s+/u', trim($needle))[0] ?? $needle;
+        $pos = mb_stripos($content, $firstToken);
         if ($pos === false) return mb_substr($content, 0, $window);
         $start = max(0, $pos - 60);
         return ($start > 0 ? '… ' : '') . mb_substr($content, $start, $window);
