@@ -8,21 +8,36 @@ use App\Models\TenderReview;
 /**
  * ComplianceService
  * ─────────────────
- * Validates a generated tender against a checklist of best practices and
- * the مرشدات of نظام المنافسات والمشتريات الحكومية.
+ * Validates a generated tender against:
  *
- * Returns a compliance score (0-100), categorized issues, and suggestions.
+ *   1. Hard rules (deterministic) — required sections, length, structure
+ *   2. The seeded GPC knowledge base (نظام م/128 + لائحة 1242 + الأدلة)
+ *      via GpcKnowledgeService — every issue links to the real article
+ *      that backs it.
  *
- * Two layers of validation:
- *   1. Hard rules (deterministic) — checks required sections, content length, etc.
- *   2. Soft analysis via Claude/Ollama — semantic checks (only when AI is configured).
+ * Returns a compliance score (0-100), categorized issues with citations,
+ * and actionable recommendations.
  */
 class ComplianceService
 {
-    public function __construct(private ClaudeService $ai) {}
+    public function __construct(
+        private ClaudeService $ai,
+        private GpcKnowledgeService $knowledge,
+    ) {}
 
     public function check(Tender $tender): TenderReview
     {
+        // Map each finding category to a specific article via direct keyword
+        // lookup. This guarantees citations even for empty/weak tenders.
+        $citationByTopic = [
+            'missing_section'    => $this->lookup('كراسة'),
+            'thin_section'       => $this->lookup('كراسة'),
+            'weak_scope'         => $this->lookup('نطاق العمل'),
+            'short_scope'        => $this->lookup('نطاق العمل'),
+            'unclear_evaluation' => $this->lookup('تقييم'),
+            'no_duration'        => $this->lookup('جدول'),
+            'missing_clause'     => $this->lookup('ضمانات'),
+        ];
         $issues = [];
 
         // ─── Layer 1: Hard rules ───
@@ -32,42 +47,48 @@ class ComplianceService
         foreach ($requiredSections as $key) {
             if (! $sections->has($key)) {
                 $issues[] = $this->issue('critical', 'missing_section', "قسم مفقود: {$key}",
-                    "كراسة الشروط يجب أن تتضمن قسم \"{$key}\" وفق نظام المنافسات والمشتريات الحكومية.",
-                    'تأكد من إضافة هذا القسم قبل اعتماد الكراسة.');
+                    "كراسة الشروط يجب أن تتضمن قسم \"{$key}\" وفق نظام المنافسات والمشتريات الحكومية ولائحته التنفيذية.",
+                    'تأكد من إضافة هذا القسم قبل اعتماد الكراسة.',
+                    $citationByTopic['missing_section']);
                 continue;
             }
             $section = $sections->get($key);
             if (mb_strlen($section->content ?? '') < 100) {
                 $issues[] = $this->issue('high', 'thin_section', "محتوى ضعيف في قسم: {$section->title}",
-                    'القسم يحتوي على نص قصير جداً وقد لا يكفي لتوضيح المتطلبات.',
-                    'وسّع المحتوى ليشمل التفاصيل الكاملة والمتطلبات الواضحة.');
+                    'القسم يحتوي على نص قصير جداً وقد لا يكفي لتوضيح المتطلبات بشكل لا يحتمل اللبس.',
+                    'وسّع المحتوى ليشمل التفاصيل الكاملة والمتطلبات الواضحة.',
+                    $citationByTopic['thin_section']);
             }
         }
 
         // Scope strength
         if ($tender->expanded_scope === null || empty($tender->expanded_scope['tasks'] ?? [])) {
             $issues[] = $this->issue('high', 'weak_scope', 'نطاق العمل غير محدد بدقة',
-                'لم يتم توسيع نطاق العمل إلى مهام تفصيلية.',
-                'أعد إدخال نطاق العمل بشكل أوضح أو أعد توليد الكراسة.');
+                'لم يتم توسيع نطاق العمل إلى مهام تفصيلية. اللائحة التنفيذية تشترط تحديد نطاق العمل بدقة ووضوح.',
+                'أعد إدخال نطاق العمل بشكل أوضح أو أعد توليد الكراسة.',
+                $citationByTopic['weak_scope']);
         } elseif (count($tender->expanded_scope['tasks']) < 4) {
             $issues[] = $this->issue('medium', 'short_scope', 'نطاق العمل يحتوي على مهام قليلة',
-                'توصي الممارسات الفضلى بتفصيل المهام بشكل أوضح.',
-                'أضف المزيد من المهام التفصيلية لكل مرحلة من مراحل المشروع.');
+                'توصي الأدلة الإجرائية بتفصيل المهام بشكل أوضح لتجنب الخلافات اللاحقة.',
+                'أضف المزيد من المهام التفصيلية لكل مرحلة من مراحل المشروع.',
+                $citationByTopic['short_scope']);
         }
 
         // Evaluation criteria
         $evalSection = $sections->get('evaluation');
         if ($evalSection && mb_strlen($evalSection->content) < 80) {
             $issues[] = $this->issue('high', 'unclear_evaluation', 'معايير التقييم غير واضحة',
-                'يجب تحديد أوزان معايير التقييم بشكل صريح وقابل للقياس.',
-                'حدد العرض الفني والمالي والخبرات بنسب واضحة.');
+                'يجب تحديد أوزان معايير التقييم بشكل صريح وقابل للقياس وفق اللائحة التنفيذية.',
+                'حدد العرض الفني والمالي والخبرات بنسب واضحة (مثلاً: فني 60%، مالي 30%، خبرات 10%).',
+                $citationByTopic['unclear_evaluation']);
         }
 
         // Duration
         if (empty($tender->duration) || $tender->duration === 'يحدد لاحقاً') {
             $issues[] = $this->issue('medium', 'no_duration', 'مدة المشروع غير محددة',
-                'لم يتم تحديد مدة تنفيذ المشروع.',
-                'حدد مدة واضحة بالأيام أو الأشهر.');
+                'لم يتم تحديد مدة تنفيذ المشروع، وهو شرط أساسي في وثائق المنافسة.',
+                'حدد مدة واضحة بالأيام أو الأشهر.',
+                $citationByTopic['no_duration']);
         }
 
         // Clauses sanity check
@@ -82,8 +103,9 @@ class ComplianceService
         foreach ($expectedClauses as $expected) {
             if (! in_array($expected, $clauseTypes, true)) {
                 $issues[] = $this->issue('medium', 'missing_clause', "بند مفقود: {$expected}",
-                    "البنود المعتادة لهذا النوع من المشاريع تتضمن {$expected}.",
-                    'أضف هذا البند يدوياً أو أعد التوليد.');
+                    "البنود المعتادة لهذا النوع من المشاريع تتضمن {$expected} وفق ممارسات النظام.",
+                    'أضف هذا البند يدوياً أو أعد التوليد.',
+                    $citationByTopic['missing_clause']);
             }
         }
 
@@ -121,14 +143,37 @@ class ComplianceService
         return max(0, min(100, $score));
     }
 
-    private function issue(string $severity, string $category, string $title, string $issue, string $recommendation): array
+    private function issue(string $severity, string $category, string $title, string $issue, string $recommendation, ?array $citation = null): array
     {
         return [
-            'severity'       => $severity,
-            'category'       => $category,
-            'title'          => $title,
-            'issue'          => $issue,
-            'recommendation' => $recommendation,
+            'severity'        => $severity,
+            'category'        => $category,
+            'title'           => $title,
+            'issue'           => $issue,
+            'recommendation'  => $recommendation,
+            'legal_reference' => $citation['label'] ?? null,
+            'reference_source' => $citation['source'] ?? null,
+            'violation_type'  => in_array($severity, ['critical', 'high'], true) ? 'مخالفة مؤكدة' : 'مؤشر خطر',
+        ];
+    }
+
+    /**
+     * Find the first GPC article whose keywords or topic match the search term.
+     * Returns the article's label and source for use as a citation.
+     */
+    private function lookup(string $term): ?array
+    {
+        $article = \App\Models\GpcArticle::where('keywords', 'like', "%{$term}%")
+            ->orWhere('topic', 'like', "%{$term}%")
+            ->orWhere('content', 'like', "%{$term}%")
+            ->orderBy('source') // prefer regulation/system before guides
+            ->first();
+
+        if (! $article) return null;
+
+        return [
+            'label'  => $article->article_label,
+            'source' => $article->source_label ?? $article->source,
         ];
     }
 

@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\AppNotification;
 use App\Models\LegalDocument;
 use App\Services\ClaudeService;
+use App\Services\GpcKnowledgeService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -36,7 +37,7 @@ class TenderReviewJob implements ShouldQueue
 
     public function __construct(public LegalDocument $document) {}
 
-    public function handle(ClaudeService $claude): void
+    public function handle(ClaudeService $claude, GpcKnowledgeService $knowledge): void
     {
         $document = $this->document->fresh();
         if (! $document) return;
@@ -55,23 +56,34 @@ class TenderReviewJob implements ShouldQueue
         $content = mb_substr($content, 0, 80000);
 
         // Clean broken cmap characters that confuse the AI model.
-        // Replace isolated Latin/special chars between Arabic chars with spaces
-        // so the AI can still understand the context from surrounding words.
         $arab = '\x{0600}-\x{06FF}';
         $content = preg_replace("/([$arab])[?|~`^]+([$arab])/u", '$1 $2', $content) ?? $content;
         $content = preg_replace("/([$arab])[A-Za-z]{1,2}([$arab])/u", '$1 $2', $content) ?? $content;
         $content = preg_replace("/([$arab])[A-Za-z]{1,2}([$arab])/u", '$1 $2', $content) ?? $content;
 
+        // ═══ RAG: Retrieve authoritative GPC articles relevant to this tender ═══
+        // The AI will be told to cite ONLY these references and not invent
+        // article numbers. This is the difference between hallucinated
+        // citations and grounded, auditable analysis.
+        $gpcContext = $knowledge->buildContextFor($content, topK: 8);
+
         // ═══ System Prompt: متخصص في نظام المنافسات والمشتريات الحكومية ═══
-        $legalContext = 'أنت مساعد قانوني متخصص في نظام المنافسات والمشتريات الحكومية السعودي.'
-            . "\nاعتمد فقط على النصوص الرسمية من: النظام، اللائحة التنفيذية، الأدلة الإجرائية الرسمية، النماذج والعقود المعتمدة."
-            . "\n\nقواعدك:"
+        // النص الرسمي معتمد على:
+        //   • النظام الصادر بالمرسوم الملكي رقم م/128 بتاريخ 13/11/1440هـ
+        //   • اللائحة التنفيذية الصادرة بقرار وزير المالية رقم 1242 بتاريخ 21/3/1441هـ
+        //   • أدلة هيئة كفاءة الإنفاق
+        $legalContext = 'أنت مساعد قانوني متخصص في نظام المنافسات والمشتريات الحكومية السعودي'
+            . ' الصادر بالمرسوم الملكي رقم م/128 بتاريخ 13/11/1440هـ ولائحته التنفيذية الصادرة بقرار'
+            . ' وزير المالية رقم 1242 بتاريخ 21/3/1441هـ، ومعهما الأدلة الإجرائية ذات الصلة من هيئة'
+            . ' كفاءة الإنفاق والمشروعات الحكومية.'
+            . "\n\nقواعدك الصارمة:"
             . "\n1) لا تجب بلا سند نظامي أو إجرائي."
-            . "\n2) كل ملاحظة يجب أن تتضمن المرجع النظامي أو الإجرائي (رقم المادة أو البند)."
-            . "\n3) ميّز بين المخالفة المؤكدة ومؤشر الخطر."
-            . "\n4) استخرج البنود، افحص الاكتمال والاتساق، حدّد المخاطر."
+            . "\n2) كل ملاحظة يجب أن تتضمن المرجع النظامي (رقم المادة) من المراجع المرفقة أدناه فقط."
+            . "\n3) لا تخترع أرقام مواد غير موجودة في المراجع المفهرسة."
+            . "\n4) ميّز بين المخالفة المؤكدة ومؤشر الخطر."
             . "\n5) إذا لم تجد سنداً واضحاً، اكتب: \"لم أجد مرجعاً نظامياً صريحاً في المصادر المفهرسة.\""
-            . "\n6) اكتب بالعربية المهنية الواضحة فقط.";
+            . "\n6) اكتب بالعربية المهنية الواضحة فقط."
+            . "\n\n" . $gpcContext;
 
         // Step 1: Get findings (individual observations)
         $findingsSystem = $legalContext

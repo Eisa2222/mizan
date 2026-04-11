@@ -64,13 +64,22 @@
                                 $sevLabel = ['critical'=>'حرجة','high'=>'عالية','medium'=>'متوسطة','improvement'=>'تحسينية'][$issue['severity']] ?? $issue['severity'];
                             @endphp
                             <div style="border-right:3px solid {{ $sevColor }};background:var(--card2);padding:10px 12px;border-radius:8px;margin-bottom:6px">
-                                <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+                                <div style="display:flex;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:6px">
                                     <span style="font-size:12px;font-weight:700;color:var(--cream)">{{ $issue['title'] }}</span>
-                                    <span style="font-size:10px;color:{{ $sevColor }};font-weight:800">{{ $sevLabel }}</span>
+                                    <div style="display:flex;gap:6px">
+                                        @if (! empty($issue['violation_type']))
+                                            @php $vColor = str_contains($issue['violation_type'], 'مؤكدة') ? '#e05555' : '#c8a94b'; @endphp
+                                            <span style="font-size:9px;padding:2px 6px;border-radius:5px;background:rgba(0,0,0,.2);color:{{ $vColor }};font-weight:700">{{ $issue['violation_type'] }}</span>
+                                        @endif
+                                        <span style="font-size:10px;color:{{ $sevColor }};font-weight:800">{{ $sevLabel }}</span>
+                                    </div>
                                 </div>
                                 <div style="font-size:11px;color:var(--dim);line-height:1.6">{{ $issue['issue'] }}</div>
+                                @if (! empty($issue['legal_reference']))
+                                    <div style="font-size:11px;color:var(--gold);margin-top:4px">📜 {{ $issue['legal_reference'] }}@if (! empty($issue['reference_source'])) — {{ $issue['reference_source'] }}@endif</div>
+                                @endif
                                 @if (! empty($issue['recommendation']))
-                                    <div style="font-size:11px;color:var(--gold);margin-top:4px">💡 {{ $issue['recommendation'] }}</div>
+                                    <div style="font-size:11px;color:#3dbf8a;margin-top:4px">💡 {{ $issue['recommendation'] }}</div>
                                 @endif
                             </div>
                         @endforeach

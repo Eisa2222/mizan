@@ -11,6 +11,7 @@ use App\Http\Controllers\DiscussionController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\MemoController;
 use App\Http\Controllers\FolderController;
+use App\Http\Controllers\GpcKnowledgeController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RelationController;
@@ -49,6 +50,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/memos/create', [MemoController::class, 'create'])->name('memos.create');
     Route::post('/memos', [MemoController::class, 'store'])->name('memos.store');
     Route::get('/memos/{document}', [MemoController::class, 'show'])->name('memos.show');
+
+    // GPC Knowledge Base (نظام المنافسات + اللائحة + الأدلة)
+    Route::get('/gpc-knowledge', [GpcKnowledgeController::class, 'index'])->name('gpc-knowledge.index');
 
     // Smart Tender Generator (مولّد الكراسات الذكي)
     Route::get('/tenders', [TenderController::class, 'index'])->name('tenders.index');

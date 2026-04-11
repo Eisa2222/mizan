@@ -37,6 +37,9 @@
     <a href="{{ route('memos.index') }}" class="mz-nav-item {{ request()->routeIs('memos.*') ? 'active' : '' }}">
         <span class="mz-ni">📄</span> مسودات المذكرات
     </a>
+    <a href="{{ route('gpc-knowledge.index') }}" class="mz-nav-item {{ request()->routeIs('gpc-knowledge.*') ? 'active' : '' }}">
+        <span class="mz-ni">📚</span> قاعدة المعرفة النظامية
+    </a>
 
     <div class="mz-nav-section" style="margin-top:8px">الإدارة</div>
     <a href="{{ route('tasks.index') }}" class="mz-nav-item {{ request()->routeIs('tasks.*') ? 'active' : '' }}">
