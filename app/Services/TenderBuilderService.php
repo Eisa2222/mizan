@@ -59,6 +59,8 @@ class TenderBuilderService
         $clauseRecords = $this->clauses->buildClauses($type);
 
         // 5. Build template context — variables that get interpolated
+        $tasks = $analysis['tasks'] ?? [];
+
         $context = [
             'title'              => $tender->title,
             'description'        => $tender->description ?: '',
@@ -66,11 +68,12 @@ class TenderBuilderService
             'date'               => now()->locale('ar')->isoFormat('D MMMM YYYY'),
             'type_label'         => Tender::TYPES[$type] ?? '',
             'duration'           => $tender->duration ?: 'يحدد لاحقاً',
-            'tasks_list'         => $analysis['tasks'] ?? [],
+            'tasks_list'         => $tasks,
             'deliverables_list'  => $this->mergeDeliverables($tender, $analysis),
             'evaluation_list'    => $this->formatEvaluationCriteria($tender->evaluation_criteria),
             'clauses_block'      => $this->clauses->renderAsBlock($clauseRecords),
             'special_conditions' => $this->formatSpecialConditions($tender->special_conditions),
+            'boq_rows'           => $this->buildBoqRows($tender, $tasks, $type),
         ];
 
         // 6. Render template into sections
@@ -135,6 +138,50 @@ class TenderBuilderService
             }
         }
         return array_filter($lines);
+    }
+
+    /**
+     * Build BOQ rows. Uses user-provided boq_items if available,
+     * otherwise auto-generates from expanded tasks.
+     */
+    private function buildBoqRows(Tender $tender, array $tasks, string $type): string
+    {
+        $userItems = $tender->boq_items ?? [];
+
+        // If user provided BOQ items, use them
+        if (! empty($userItems)) {
+            $rows = [];
+            foreach ($userItems as $i => $item) {
+                $num  = $i + 1;
+                $desc = $item['description'] ?? '—';
+                $unit = $item['unit'] ?? 'مقطوعية';
+                $qty  = $item['quantity'] ?? 1;
+                $rows[] = "| {$num} | {$desc} | {$unit} | {$qty} | | |";
+            }
+            return implode("\n", $rows);
+        }
+
+        // Auto-generate from tasks
+        if (empty($tasks)) {
+            return "| 1 | يحدد لاحقاً | — | — | | |";
+        }
+
+        $unit = match ($type) {
+            'operations'   => 'شهر',
+            'consulting'   => 'مرحلة',
+            'legal'        => 'خدمة',
+            'construction' => 'وحدة',
+            default        => 'مقطوعية',
+        };
+
+        $rows = [];
+        foreach ($tasks as $i => $task) {
+            $num = $i + 1;
+            $desc = is_string($task) ? $task : ($task['title'] ?? $task['name'] ?? '—');
+            $rows[] = "| {$num} | {$desc} | {$unit} | 1 | | |";
+        }
+
+        return implode("\n", $rows);
     }
 
     private function formatSpecialConditions(?array $conditions): string

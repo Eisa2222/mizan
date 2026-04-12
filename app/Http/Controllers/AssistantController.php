@@ -8,6 +8,7 @@ use App\Models\DocumentChunk;
 use App\Models\LegalDocument;
 use App\Services\ArabicTextNormalizerService;
 use App\Services\ClaudeService;
+use App\Services\TasbibatKnowledgeService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -41,6 +42,7 @@ class AssistantController extends Controller
     public function __construct(
         private ClaudeService $claude,
         private ArabicTextNormalizerService $normalizer,
+        private TasbibatKnowledgeService $tasbibat,
     ) {}
 
     public function start(Request $request): JsonResponse
@@ -164,10 +166,12 @@ class AssistantController extends Controller
         $arabicRule = "تعليمات صارمة: يجب أن تكتب إجابتك بالكامل باللغة العربية الفصحى. لا تستخدم اللغة الإنجليزية أبداً. لا تترجم المصطلحات للإنجليزية. كل كلمة في إجابتك يجب أن تكون عربية.";
 
         if (! $conversation->document_id) {
-            return [
-                "أنت مساعد قانوني محترف متخصص في الأنظمة السعودية. $arabicRule",
-                [],
-            ];
+            $tasbibatCtx = $this->tasbibat->buildContextFor($userQuery, topK: 3);
+            $sys = "أنت مساعد قانوني محترف متخصص في الأنظمة السعودية. $arabicRule";
+            if ($tasbibatCtx !== '') {
+                $sys .= "\n\n" . $tasbibatCtx;
+            }
+            return [$sys, []];
         }
 
         $document = $conversation->document;

@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\AppNotification;
 use App\Models\LegalDocument;
 use App\Services\ClaudeService;
+use App\Services\TasbibatKnowledgeService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -29,7 +30,7 @@ class ReviewContractJob implements ShouldQueue
 
     public function __construct(public LegalDocument $document) {}
 
-    public function handle(ClaudeService $claude): void
+    public function handle(ClaudeService $claude, TasbibatKnowledgeService $tasbibat): void
     {
         $document = $this->document->fresh();
         if (! $document) return;
@@ -47,11 +48,28 @@ class ReviewContractJob implements ShouldQueue
 
         $content = mb_substr($content, 0, 80000);
 
-        $system = 'أنت مراجع عقود قانوني سعودي. أرجع JSON فقط بالعربية بهذا الشكل:'
-            . ' {"summary":"ملخص تفصيلي 3-5 جمل","risks":[{"severity":"high","description":"وصف تفصيلي للمخاطرة","clause":"نص البند المعني من العقد","mitigation":"الحل المقترح بالتفصيل"}],'
-            . '"recommended_amendments":[{"current":"النص الحالي كاملاً من العقد","suggested":"النص المقترح بعد التعديل كاملاً","reason":"سبب التعديل"}],'
-            . '"missing_protections":["وصف تفصيلي للبند الناقص"],"overall_rating":"جيد","overall_notes":"ملاحظات تفصيلية"}'
-            . "\n\nتعليمات: 1) اكتب تفاصيل كاملة في كل حقل 2) في recommended_amendments اكتب النص الأصلي من العقد في current والنص المعدّل في suggested 3) في risks.mitigation اكتب الحل كاملاً 4) JSON فقط بالعربية";
+        // Retrieve tasbibat relevant to contract disputes for RAG context
+        $tasbibatContext = $tasbibat->buildContextFor($content, courtType: 'تجاري', topK: 4);
+
+        $system = <<<SYSTEM
+أنت مراجع عقود قانوني سعودي متخصص. راجع العقد بعمق واستعن بالتسبيبات القضائية المرفقة لتحديد المخاطر القانونية بناءً على أحكام قضائية سابقة.
+
+المهام:
+1. لخّص العقد (3-5 جمل).
+2. حدد المخاطر القانونية مع درجة الخطورة (critical/high/medium/low) وبيّن البند المعني والحل.
+3. إذا وجدت حكماً قضائياً من التسبيبات المرفقة يتعلق بنزاع مشابه لبند في العقد، أشر إليه.
+4. اقترح تعديلات محددة (النص الحالي → النص المقترح) مع السبب.
+5. حدد البنود الناقصة.
+
+{$tasbibatContext}
+
+أرجع JSON فقط بالعربية بهذا الشكل:
+{"summary":"ملخص تفصيلي 3-5 جمل","risks":[{"severity":"high","description":"وصف تفصيلي للمخاطرة","clause":"نص البند المعني من العقد","mitigation":"الحل المقترح بالتفصيل","judicial_precedent":"إشارة لتسبيب قضائي مشابه إن وُجد"}],
+"recommended_amendments":[{"current":"النص الحالي كاملاً","suggested":"النص المقترح بعد التعديل كاملاً","reason":"سبب التعديل"}],
+"missing_protections":["وصف تفصيلي للبند الناقص"],"overall_rating":"جيد","overall_notes":"ملاحظات تفصيلية"}
+
+تعليمات: 1) اكتب تفاصيل كاملة في كل حقل 2) في recommended_amendments اكتب النص الأصلي من العقد في current والنص المعدّل في suggested 3) في risks.mitigation اكتب الحل كاملاً 4) JSON فقط بالعربية
+SYSTEM;
 
         try {
             $result = $claude->chatJson(

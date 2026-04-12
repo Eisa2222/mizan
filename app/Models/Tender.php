@@ -12,13 +12,14 @@ class Tender extends Model
     protected $fillable = [
         'org_id', 'created_by', 'title', 'description', 'scope_input',
         'type', 'duration', 'deliverables', 'evaluation_criteria',
-        'special_conditions', 'expanded_scope', 'status',
+        'special_conditions', 'boq_items', 'expanded_scope', 'status',
     ];
 
     protected $casts = [
         'deliverables' => 'array',
         'evaluation_criteria' => 'array',
         'special_conditions' => 'array',
+        'boq_items' => 'array',
         'expanded_scope' => 'array',
     ];
 

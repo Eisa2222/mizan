@@ -331,9 +331,18 @@ class TextExtractorService
         if ($raw === false) return null;
 
         // Detect encoding and convert to UTF-8 if needed
-        $enc = mb_detect_encoding($raw, ['UTF-8', 'Windows-1256', 'ISO-8859-6'], true);
-        if ($enc && $enc !== 'UTF-8') {
-            $raw = mb_convert_encoding($raw, 'UTF-8', $enc);
+        // PHP 8.3's mbstring dropped Windows-1256 from its detect list, so we
+        // try UTF-8 first, then fall back to iconv for the common Arabic
+        // single-byte encodings (Windows-1256 / ISO-8859-6) which iconv still
+        // ships with universally.
+        if (! mb_check_encoding($raw, 'UTF-8')) {
+            foreach (['Windows-1256', 'ISO-8859-6'] as $enc) {
+                $converted = @iconv($enc, 'UTF-8//IGNORE', $raw);
+                if ($converted !== false && mb_check_encoding($converted, 'UTF-8')) {
+                    $raw = $converted;
+                    break;
+                }
+            }
         }
 
         return $this->cleanup($raw);

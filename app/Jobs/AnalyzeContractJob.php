@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\AppNotification;
 use App\Models\LegalDocument;
 use App\Services\ClaudeService;
+use App\Services\TasbibatKnowledgeService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -36,7 +37,7 @@ class AnalyzeContractJob implements ShouldQueue
 
     public function __construct(public LegalDocument $document) {}
 
-    public function handle(ClaudeService $claude): void
+    public function handle(ClaudeService $claude, TasbibatKnowledgeService $tasbibat): void
     {
         $document = $this->document->fresh();
         if (! $document) return;
@@ -55,12 +56,21 @@ class AnalyzeContractJob implements ShouldQueue
         // Truncate to keep cost predictable; legal contracts > 80K chars are rare
         $content = mb_substr($content, 0, 80000);
 
-        $system = 'أنت محلل عقود قانوني. حلّل العقد وأرجع JSON فقط (بالعربية):'
-            . ' {"summary":"ملخص","parties":["طرف1","طرف2"],'
-            . '"risks":[{"clause":"البند","severity":"high","explanation":"شرح","suggested_change":"اقتراح"}],'
-            . '"obligations":[{"party":"الطرف","obligation":"الالتزام"}],'
-            . '"missing_clauses":["بند مفقود"]}'
-            . "\n\nأرجع JSON فقط بدون أي نص إضافي. severity: low أو medium أو high. بالعربية فقط.";
+        $tasbibatContext = $tasbibat->buildContextFor($content, courtType: 'تجاري', topK: 4);
+
+        $system = <<<SYSTEM
+أنت محلل عقود قانوني سعودي. حلّل العقد واستعن بالتسبيبات القضائية المرفقة لتحديد بنود قد تؤدي لنزاعات.
+
+{$tasbibatContext}
+
+أرجع JSON فقط (بالعربية):
+{"summary":"ملخص","parties":["طرف1","طرف2"],
+"risks":[{"clause":"البند","severity":"high","explanation":"شرح","suggested_change":"اقتراح","judicial_precedent":"إشارة لتسبيب مشابه إن وُجد"}],
+"obligations":[{"party":"الطرف","obligation":"الالتزام"}],
+"missing_clauses":["بند مفقود"]}
+
+severity: low أو medium أو high. بالعربية فقط.
+SYSTEM;
 
         try {
             $result = $claude->chatJson(

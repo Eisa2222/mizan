@@ -42,7 +42,7 @@ class ComplianceService
 
         // ─── Layer 1: Hard rules ───
         $sections = $tender->sections->keyBy('section_key');
-        $requiredSections = ['introduction', 'scope', 'deliverables', 'timeline', 'qualifications', 'evaluation', 'conditions', 'pricing'];
+        $requiredSections = ['introduction', 'scope', 'deliverables', 'methodology', 'timeline', 'qualifications', 'evaluation', 'conditions', 'boq', 'pricing'];
 
         foreach ($requiredSections as $key) {
             if (! $sections->has($key)) {
@@ -83,11 +83,11 @@ class ComplianceService
                 $citationByTopic['unclear_evaluation']);
         }
 
-        // Duration
+        // Duration — mandatory per نظام المنافسات
         if (empty($tender->duration) || $tender->duration === 'يحدد لاحقاً') {
-            $issues[] = $this->issue('medium', 'no_duration', 'مدة المشروع غير محددة',
-                'لم يتم تحديد مدة تنفيذ المشروع، وهو شرط أساسي في وثائق المنافسة.',
-                'حدد مدة واضحة بالأيام أو الأشهر.',
+            $issues[] = $this->issue('high', 'no_duration', 'مدة المشروع غير محددة',
+                'لم يتم تحديد مدة تنفيذ المشروع، وهو شرط أساسي في وثائق المنافسة. اللائحة التنفيذية تشترط تحديد المدة صراحةً.',
+                'حدد مدة واضحة بالأيام أو الأشهر قبل طرح الكراسة.',
                 $citationByTopic['no_duration']);
         }
 
@@ -179,14 +179,20 @@ class ComplianceService
 
     private function buildSummary(int $score, array $stats): string
     {
-        if ($score >= 90) {
-            return "الكراسة جاهزة للطرح. نسبة الامتثال {$score}% ولا توجد ملاحظات حرجة.";
+        if ($score >= 90 && $stats['critical'] === 0 && $stats['high'] === 0) {
+            return "الكراسة جاهزة للطرح. نسبة الامتثال {$score}% ولا توجد ملاحظات حرجة أو عالية.";
+        }
+        if ($stats['critical'] > 0) {
+            return "الكراسة تحتاج مراجعة جوهرية. نسبة الامتثال {$score}% مع {$stats['critical']} ملاحظة حرجة يجب معالجتها قبل الطرح.";
+        }
+        if ($stats['high'] > 0) {
+            return "الكراسة تحتاج تعديلات قبل الطرح. نسبة الامتثال {$score}% مع {$stats['high']} ملاحظة عالية الأهمية.";
         }
         if ($score >= 70) {
-            return "الكراسة بحالة جيدة لكن تحتاج بعض التحسينات. نسبة الامتثال {$score}%.";
+            return "الكراسة بحالة جيدة لكن تحتاج بعض التحسينات الطفيفة. نسبة الامتثال {$score}%.";
         }
         if ($score >= 50) {
-            return "الكراسة تحتاج مراجعة جوهرية قبل الطرح. نسبة الامتثال {$score}% مع {$stats['critical']} ملاحظة حرجة و{$stats['high']} عالية.";
+            return "الكراسة تحتاج مراجعة جوهرية قبل الطرح. نسبة الامتثال {$score}%.";
         }
         return "الكراسة لا تستوفي الحد الأدنى من المتطلبات. لا يُنصح بطرحها قبل المعالجة.";
     }

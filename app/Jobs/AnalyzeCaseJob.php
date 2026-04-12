@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\AppNotification;
 use App\Models\LegalDocument;
 use App\Services\ClaudeService;
+use App\Services\TasbibatKnowledgeService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -29,7 +30,7 @@ class AnalyzeCaseJob implements ShouldQueue
 
     public function __construct(public LegalDocument $document) {}
 
-    public function handle(ClaudeService $claude): void
+    public function handle(ClaudeService $claude, TasbibatKnowledgeService $tasbibat): void
     {
         $document = $this->document->fresh();
         if (! $document) return;
@@ -47,12 +48,29 @@ class AnalyzeCaseJob implements ShouldQueue
 
         $content = mb_substr($content, 0, 80000);
 
-        $system = 'أنت محلل قضايا قانونية. حلّل القضية وأرجع JSON فقط (بالعربية):'
-            . ' {"summary":"ملخص","court":"الجهة","ruling":"الحكم",'
-            . '"legal_basis":[{"reference":"المرجع","explanation":"شرح"}],'
-            . '"applicable_laws":["نظام"],"outcome_prediction":"توقع",'
-            . '"success_factors":["عامل نجاح"],"risk_factors":["عامل خطر"]}'
-            . "\n\nأرجع JSON فقط بدون أي نص إضافي. بالعربية فقط.";
+        // Retrieve similar judicial reasoning patterns for RAG context
+        $tasbibatContext = $tasbibat->buildContextFor($content, topK: 5);
+
+        $system = <<<SYSTEM
+أنت محلل قضايا قانونية سعودي متخصص. حلّل القضية بعمق واستعن بالتسبيبات القضائية المرفقة لتدعيم تحليلك.
+
+المهام:
+1. لخّص القضية وحدد المحكمة والحكم.
+2. حدد الأسانيد النظامية المرتبطة مع شرح وجه الاستدلال.
+3. اذكر الأنظمة المطبّقة.
+4. قدم توقعاً مبنياً على أنماط التسبيب المشابهة المرفقة — إذا وُجد نمط مشابه اذكره صراحة.
+5. حدد عوامل النجاح وعوامل الخطر.
+6. إذا وجدت سوابق قضائية من التسبيبات المرفقة تدعم أو تخالف الحكم، أشر إليها.
+
+{$tasbibatContext}
+
+أرجع JSON فقط بالشكل التالي (بالعربية فقط):
+{"summary":"ملخص","court":"الجهة","ruling":"الحكم",
+"legal_basis":[{"reference":"المرجع","explanation":"شرح","similar_pattern":"نمط تسبيب مشابه إن وُجد"}],
+"applicable_laws":["نظام"],"outcome_prediction":"توقع",
+"success_factors":["عامل نجاح"],"risk_factors":["عامل خطر"],
+"related_tasbibat":["إشارة لتسبيب مشابه من القاعدة المعرفية إن وُجد"]}
+SYSTEM;
 
         try {
             $result = $claude->chatJson(

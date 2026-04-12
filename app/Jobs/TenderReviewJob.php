@@ -6,6 +6,7 @@ use App\Models\AppNotification;
 use App\Models\LegalDocument;
 use App\Services\ClaudeService;
 use App\Services\GpcKnowledgeService;
+use App\Services\TenderAiPromptBuilder;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -37,7 +38,7 @@ class TenderReviewJob implements ShouldQueue
 
     public function __construct(public LegalDocument $document) {}
 
-    public function handle(ClaudeService $claude, GpcKnowledgeService $knowledge): void
+    public function handle(ClaudeService $claude, GpcKnowledgeService $knowledge, TenderAiPromptBuilder $prompts): void
     {
         $document = $this->document->fresh();
         if (! $document) return;
@@ -61,48 +62,11 @@ class TenderReviewJob implements ShouldQueue
         $content = preg_replace("/([$arab])[A-Za-z]{1,2}([$arab])/u", '$1 $2', $content) ?? $content;
         $content = preg_replace("/([$arab])[A-Za-z]{1,2}([$arab])/u", '$1 $2', $content) ?? $content;
 
-        // ═══ RAG: Retrieve authoritative GPC articles relevant to this tender ═══
-        // The AI will be told to cite ONLY these references and not invent
-        // article numbers. This is the difference between hallucinated
-        // citations and grounded, auditable analysis.
-        $gpcContext = $knowledge->buildContextFor($content, topK: 8);
-
-        // ═══ System Prompt: متخصص في نظام المنافسات والمشتريات الحكومية ═══
-        // النص الرسمي معتمد على:
-        //   • النظام الصادر بالمرسوم الملكي رقم م/128 بتاريخ 13/11/1440هـ
-        //   • اللائحة التنفيذية الصادرة بقرار وزير المالية رقم 1242 بتاريخ 21/3/1441هـ
-        //   • أدلة هيئة كفاءة الإنفاق
-        $legalContext = 'أنت مساعد قانوني متخصص في نظام المنافسات والمشتريات الحكومية السعودي'
-            . ' الصادر بالمرسوم الملكي رقم م/128 بتاريخ 13/11/1440هـ ولائحته التنفيذية الصادرة بقرار'
-            . ' وزير المالية رقم 1242 بتاريخ 21/3/1441هـ، ومعهما الأدلة الإجرائية ذات الصلة من هيئة'
-            . ' كفاءة الإنفاق والمشروعات الحكومية.'
-            . "\n\nقواعدك الصارمة:"
-            . "\n1) لا تجب بلا سند نظامي أو إجرائي."
-            . "\n2) كل ملاحظة يجب أن تتضمن المرجع النظامي (رقم المادة) من المراجع المرفقة أدناه فقط."
-            . "\n3) لا تخترع أرقام مواد غير موجودة في المراجع المفهرسة."
-            . "\n4) ميّز بين المخالفة المؤكدة ومؤشر الخطر."
-            . "\n5) إذا لم تجد سنداً واضحاً، اكتب: \"لم أجد مرجعاً نظامياً صريحاً في المصادر المفهرسة.\""
-            . "\n6) اكتب بالعربية المهنية الواضحة فقط."
-            . "\n\n" . $gpcContext;
-
-        // Step 1: Get findings (individual observations)
-        $findingsSystem = $legalContext
-            . "\n\nراجع كراسة الشروط والمواصفات وأرجع JSON فقط بالعربية بالشكل:"
-            . "\n{\"findings\":[{\"category\":\"نظامي\",\"severity\":\"عالية\",\"title\":\"عنوان الملاحظة\","
-            . "\"issue\":\"وصف المشكلة مع ذكر البند المخالف من الكراسة\","
-            . "\"legal_reference\":\"المادة XX من نظام المنافسات أو اللائحة التنفيذية\","
-            . "\"violation_type\":\"مخالفة مؤكدة أو مؤشر خطر\","
-            . "\"recommendation\":\"التوصية والصياغة المقترحة بالتفصيل\"}]}"
-            . "\ncategory: نظامي أو شكلي أو موضوعي أو عدالة"
-            . "\nseverity: حرجة أو عالية أو متوسطة أو تحسينية"
-            . "\nحلّل المحتوى الفعلي. اذكر المرجع النظامي لكل ملاحظة.";
-
-        // Step 2: Get overall assessment
-        $summarySystem = $legalContext
-            . "\n\nقيّم الكراسة بشكل عام وأرجع JSON بالعربية:"
-            . "\n{\"compliance_score\":75,\"executive_summary\":\"هل الكراسة جاهزة للطرح؟ وما البنود الحرجة قبل الاعتماد؟ مع المراجع النظامية.\","
-            . "\"ready_for_tender\":false,\"needs_legal_review\":true}"
-            . "\ncompliance_score من 0 لـ 100. بالعربية فقط.";
+        // ═══ Build system prompts via the centralized TenderAiPromptBuilder ═══
+        // Every governance rule, authority hierarchy, RAG context and output
+        // schema lives in that one service — this job just dispatches to it.
+        $findingsSystem = $prompts->reviewFindingsSystem($content);
+        $summarySystem  = $prompts->reviewSummarySystem($content);
 
         $findings = [];
         $summary = [];
@@ -113,14 +77,9 @@ class TenderReviewJob implements ShouldQueue
         for ($attempt = 1; $attempt <= 2; $attempt++) {
             try {
                 $raw = $claude->chat(
-                    messages: [['role' => 'user', 'content' => "راجع كراسة الشروط والمواصفات التالية مقابل نظام المنافسات والمشتريات الحكومية ولائحته التنفيذية."
-                        . "\nاستخرج البنود، افحص الاكتمال والاتساق، حدّد المخاطر، وصنّفها."
-                        . "\nلكل ملاحظة اذكر: المرجع النظامي، نوع المخالفة (مؤكدة أو مؤشر خطر)، والتوصية."
-                        . "\nأرجع JSON فقط بالشكل:"
-                        . "\n{\"findings\":[{\"category\":\"نظامي\",\"severity\":\"عالية\",\"title\":\"عنوان\",\"issue\":\"المشكلة\",\"legal_reference\":\"المادة XX\",\"violation_type\":\"مخالفة مؤكدة\",\"recommendation\":\"التوصية\"}]}"
-                        . "\n\nالكراسة:\n" . mb_substr($content, 0, 8000)]],
+                    messages: [['role' => 'user', 'content' => "راجع كراسة الشروط والمواصفات التالية والتزم بالهرم الأربعي للسند.\n\nالكراسة:\n" . mb_substr($content, 0, 8000)]],
                     system: $findingsSystem,
-                    maxTokens: 3000,
+                    maxTokens: 4000,
                 );
                 $text = $raw['text'];
                 Log::info("TenderReviewJob findings raw", ['text_len' => mb_strlen($text), 'preview' => mb_substr($text, 0, 200)]);
@@ -143,16 +102,18 @@ class TenderReviewJob implements ShouldQueue
         for ($attempt = 1; $attempt <= 2; $attempt++) {
             try {
                 $raw = $claude->chat(
-                    messages: [['role' => 'user', 'content' => "قيّم هذه الكراسة بشكل عام مقابل نظام المنافسات والمشتريات الحكومية."
-                        . "\nهل الكراسة جاهزة للطرح؟ هل تحتاج مراجعة قانونية؟ ما البنود الحرجة قبل الاعتماد؟"
-                        . "\nأرجع JSON فقط: {\"compliance_score\":75,\"executive_summary\":\"التقييم مع المراجع النظامية\",\"ready_for_tender\":false,\"needs_legal_review\":true}"
-                        . "\n\nالكراسة:\n" . mb_substr($content, 0, 8000)]],
+                    messages: [['role' => 'user', 'content' => "قيّم هذه الكراسة بشكل عام مقابل الهرم الأربعي للسند.\n\nالكراسة:\n" . mb_substr($content, 0, 8000)]],
                     system: $summarySystem,
-                    maxTokens: 500,
+                    maxTokens: 800,
                 );
                 if (preg_match('/\{[\s\S]*\}/u', $raw['text'], $m)) {
                     $decoded = json_decode($m[0], true);
-                    if (is_array($decoded) && isset($decoded['compliance_score'])) {
+                    if (is_array($decoded) && (isset($decoded['overall_score']) || isset($decoded['compliance_score']))) {
+                        // Normalize field name: the new schema uses overall_score,
+                        // the legacy schema used compliance_score. Accept either.
+                        if (isset($decoded['overall_score']) && ! isset($decoded['compliance_score'])) {
+                            $decoded['compliance_score'] = $decoded['overall_score'];
+                        }
                         $summary = $decoded;
                         break;
                     }
@@ -170,22 +131,47 @@ class TenderReviewJob implements ShouldQueue
         }
 
         // Ensure findings is an array of arrays (not a single finding object)
-        if (!empty($findings) && isset($findings['category'])) {
-            $findings = [$findings]; // wrap single finding in array
+        if (!empty($findings) && (isset($findings['issue_title']) || isset($findings['category']))) {
+            $findings = [$findings];
         }
 
-        // Count by severity
-        $critical = collect($findings)->where('severity', 'حرجة')->count();
-        $high = collect($findings)->where('severity', 'عالية')->count();
-        $medium = collect($findings)->where('severity', 'متوسطة')->count();
-        $improvement = collect($findings)->where('severity', 'تحسينية')->count();
+        // Normalize each finding: accept both the old schema (category/title/issue)
+        // and the new governance schema (issue_title, basis_type, basis_reference).
+        $findings = array_map(function ($f) {
+            return [
+                'issue_title'        => $f['issue_title'] ?? $f['title'] ?? '',
+                'severity'           => $this->normalizeSeverity($f['severity'] ?? 'Medium'),
+                'affected_section'   => $f['affected_section'] ?? $f['category'] ?? '',
+                'detected_text'      => $f['detected_text'] ?? '',
+                'why_it_is_an_issue' => $f['why_it_is_an_issue'] ?? $f['issue'] ?? '',
+                'basis_type'         => $f['basis_type'] ?? 'law',
+                'basis_reference'    => $f['basis_reference'] ?? $f['legal_reference'] ?? '',
+                'violation_type'     => $f['violation_type'] ?? null,
+                'recommendation'     => $f['recommendation'] ?? '',
+                'suggested_rewrite'  => $f['suggested_rewrite'] ?? '',
+                // Back-compat keys for existing views
+                'title'              => $f['issue_title'] ?? $f['title'] ?? '',
+                'category'           => $f['basis_type'] ?? $f['category'] ?? '',
+                'issue'              => $f['why_it_is_an_issue'] ?? $f['issue'] ?? '',
+                'legal_reference'    => $f['basis_reference'] ?? $f['legal_reference'] ?? '',
+            ];
+        }, $findings);
+
+        // Count by severity (normalized English keys)
+        $critical    = collect($findings)->where('severity', 'Critical')->count();
+        $high        = collect($findings)->where('severity', 'High')->count();
+        $medium      = collect($findings)->where('severity', 'Medium')->count();
+        $improvement = collect($findings)->where('severity', 'Improvement')->count();
 
         $document->analysis = [
-            'compliance_score' => $summary['compliance_score'] ?? 70,
-            'executive_summary' => $summary['executive_summary'] ?? 'تم المراجعة.',
-            'ready_for_tender' => $summary['ready_for_tender'] ?? ($critical === 0),
-            'findings' => $findings,
-            'statistics' => ['critical' => $critical, 'high' => $high, 'medium' => $medium, 'improvement' => $improvement],
+            'compliance_score'    => $summary['compliance_score'] ?? $summary['overall_score'] ?? 70,
+            'executive_summary'   => $summary['summary'] ?? $summary['executive_summary'] ?? 'تم المراجعة.',
+            'ready_for_tender'    => $summary['ready_for_tender'] ?? ($critical === 0),
+            'needs_legal_review'  => $summary['needs_legal_review'] ?? ($critical > 0 || $high > 2),
+            'readiness_status'    => $summary['readiness_status'] ?? null,
+            'final_recommendation' => $summary['final_recommendation'] ?? null,
+            'findings'            => $findings,
+            'statistics'          => ['critical' => $critical, 'high' => $high, 'medium' => $medium, 'improvement' => $improvement],
         ];
         $meta = $document->metadata ?? [];
         $meta['analysis_status'] = 'ready';
@@ -193,16 +179,38 @@ class TenderReviewJob implements ShouldQueue
         $document->metadata = $meta;
         $document->save();
 
-        $score = $result['data']['compliance_score'] ?? '—';
-        $findings = count($result['data']['findings'] ?? []);
+        $score = $document->analysis['compliance_score'] ?? '—';
+        $findingsCount = count($findings);
 
         AppNotification::notify(
             userId: $document->uploaded_by,
             type: 'tender_reviewed',
             title: 'اكتملت مراجعة الكراسة',
-            body: "نسبة الامتثال: {$score}% · {$findings} ملاحظة — افتح الكراسة لعرض التقرير.",
+            body: "نسبة الامتثال: {$score}% · {$findingsCount} ملاحظة — افتح الكراسة لعرض التقرير.",
             data: ['document_id' => $document->id]
         );
+    }
+
+    private function normalizeSeverity(string $sev): string
+    {
+        $map = [
+            'critical'    => 'Critical',
+            'high'        => 'High',
+            'medium'      => 'Medium',
+            'low'         => 'Improvement',
+            'improvement' => 'Improvement',
+            'حرجة'        => 'Critical',
+            'حرج'         => 'Critical',
+            'عالية'       => 'High',
+            'عالي'        => 'High',
+            'متوسطة'      => 'Medium',
+            'متوسط'       => 'Medium',
+            'تحسينية'     => 'Improvement',
+            'تحسيني'      => 'Improvement',
+            'منخفضة'      => 'Improvement',
+        ];
+        $key = mb_strtolower(trim($sev));
+        return $map[$key] ?? $map[trim($sev)] ?? 'Medium';
     }
 
     private function markStatus(LegalDocument $document, string $status, string $reason): void
