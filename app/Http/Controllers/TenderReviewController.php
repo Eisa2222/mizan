@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\AnalyzeReviewSimilarityJob;
 use App\Jobs\TenderReviewJob;
 use App\Models\LegalDocument;
 use App\Services\ElasticsearchService;
@@ -67,6 +68,10 @@ class TenderReviewController extends Controller
         if ($document->content) {
             app(ElasticsearchService::class)->reindexDocument($document);
             TenderReviewJob::dispatch($document);
+            // Run similarity comparison synchronously (queue worker not guaranteed)
+            try {
+                app(\App\Services\TenderSimilarityService::class)->compareReview($document);
+            } catch (\Throwable) {}
         }
 
         return redirect()->route('tender-reviews.show', $document)

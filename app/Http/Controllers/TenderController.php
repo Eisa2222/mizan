@@ -63,7 +63,8 @@ class TenderController extends Controller
             'title'                      => 'required|string|max:255',
             'description'                => 'nullable|string|max:5000',
             'scope_input'                => 'required|string|min:10|max:10000',
-            'type'                       => 'required|in:it,construction,consulting,operations,legal',
+            'type'                       => 'required|in:' . implode(',', array_keys(\App\Models\Tender::TYPES)),
+            'custom_type'                => 'nullable|string|max:100',
             'duration'                   => 'nullable|string|max:100',
             'deliverables'               => 'nullable|array',
             'deliverables.*'             => 'string|max:500',
@@ -76,6 +77,12 @@ class TenderController extends Controller
             'boq_items.*.quantity'       => 'nullable|integer|min:1',
         ]);
 
+        // If "other" type selected, prepend custom type name to description
+        if ($data['type'] === 'other' && ! empty($data['custom_type'])) {
+            $data['description'] = '[نوع: ' . $data['custom_type'] . '] ' . ($data['description'] ?? '');
+        }
+        unset($data['custom_type']);
+
         $tender = Tender::create([
             ...$data,
             'org_id'     => $request->user()->org_id,
@@ -85,6 +92,12 @@ class TenderController extends Controller
 
         // Build sections + clauses immediately (synchronous)
         $tender = $this->builder->build($tender);
+
+        // Run similarity analysis (synchronous — queue worker not guaranteed)
+        try {
+            app(\App\Services\TenderSimilarityService::class)->analyze($tender);
+        } catch (\Throwable) {}
+
 
         return redirect()->route('tenders.show', $tender)
             ->with('success', 'تم توليد الكراسة بنجاح. راجع الأقسام وعدّلها حسب الحاجة.');
@@ -116,6 +129,9 @@ class TenderController extends Controller
     {
         $this->ensureSameOrg($request, $tender);
         $this->builder->build($tender);
+        try {
+            app(\App\Services\TenderSimilarityService::class)->analyze($tender);
+        } catch (\Throwable) {}
         return back()->with('success', 'تم إعادة توليد الكراسة بنجاح.');
     }
 

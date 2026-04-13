@@ -25,12 +25,12 @@ class TaskPolicy
 
     public function create(User $user): bool
     {
-        return $user->hasAtLeastRole(UserRole::Researcher);
+        return $user->hasAtLeastRole(UserRole::OrgUser);
     }
 
     public function update(User $user, Task $task): bool
     {
-        return $this->sameOrg($user, $task) && $user->hasAtLeastRole(UserRole::Researcher);
+        return $this->sameOrg($user, $task) && $user->hasAtLeastRole(UserRole::OrgUser);
     }
 
     public function delete(User $user, Task $task): bool

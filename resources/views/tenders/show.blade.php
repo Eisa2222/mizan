@@ -88,6 +88,72 @@
             </div>
         @endif
 
+        {{-- Similarity Panel --}}
+        <div x-data="similarityPanel()" x-init="loadResults()" style="margin-bottom:16px">
+            <template x-if="topAlert">
+                <div class="mz-card" :style="alertStyle()" style="padding:14px 18px;margin-bottom:12px">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                        <div>
+                            <span x-text="alertIcon()" style="font-size:18px;margin-left:8px"></span>
+                            <span style="font-weight:700" x-text="topAlert.message"></span>
+                            <span style="font-size:12px;color:var(--mute);margin-right:8px" x-text="matches.length + ' كراسة مشابهة'"></span>
+                        </div>
+                        <button @click="showPanel = !showPanel" class="mz-btn mz-btn-ghost mz-btn-sm" x-text="showPanel ? 'إخفاء' : 'عرض التفاصيل'"></button>
+                    </div>
+                </div>
+            </template>
+
+            <template x-if="showPanel && matches.length > 0">
+                <div class="mz-card" style="padding:0;overflow:hidden;margin-bottom:12px">
+                    <div style="padding:12px 16px;background:var(--card2);border-bottom:1px solid var(--borderl);font-size:13px;font-weight:700;color:var(--gold)">
+                        كراسات مشابهة داخل الجهة
+                    </div>
+                    <template x-for="m in matches" :key="m.tender_id">
+                        <div style="padding:12px 16px;border-bottom:1px solid var(--borderl)">
+                            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+                                <div style="flex:1">
+                                    <div style="font-size:13px;font-weight:700;color:var(--cream)" x-text="m.title"></div>
+                                    <div style="font-size:11px;color:var(--mute);margin-top:3px">
+                                        <span x-text="m.type_label"></span> ·
+                                        <span x-text="m.status_label"></span>
+                                        <template x-if="m.compliance_score">
+                                            <span> · امتثال: <span x-text="m.compliance_score + '%'" style="color:var(--gold)"></span></span>
+                                        </template>
+                                    </div>
+                                    <template x-if="m.lessons_learned && m.lessons_learned.length">
+                                        <div style="font-size:11px;color:var(--dim);margin-top:4px">
+                                            <span style="color:var(--gold)">دروس مستفادة:</span>
+                                            <template x-for="l in m.lessons_learned.slice(0,2)"><span x-text="' · ' + l"></span></template>
+                                        </div>
+                                    </template>
+                                </div>
+                                <div style="text-align:center;min-width:80px">
+                                    <div style="font-size:20px;font-weight:900" :style="'color:' + scoreColor(m.final_similarity_score)" x-text="Math.round(m.final_similarity_score) + '%'"></div>
+                                    <div style="font-size:10px;color:var(--mute)" x-text="m.similarity_label || (m.similarity_level === 'partial_match' ? 'تطابق جزئي' : '')"></div>
+                                </div>
+                                <div style="display:flex;flex-direction:column;gap:4px">
+                                    <a :href="'/tenders/' + m.tender_id" target="_blank" class="mz-btn mz-btn-ghost mz-btn-sm" style="font-size:11px">فتح</a>
+                                <button @click="ignoreTender(m)" class="mz-btn mz-btn-ghost mz-btn-sm" style="font-size:11px;color:var(--mute)">تجاهل</button>
+                                </div>
+                            </div>
+                            {{-- Matched segments: which parts of the scope match --}}
+                            <template x-if="m.matched_segments && m.matched_segments.length > 0">
+                                <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--borderl)">
+                                    <div style="font-size:11px;color:var(--gold);font-weight:700;margin-bottom:6px">أجزاء النطاق المتطابقة:</div>
+                                    <template x-for="seg in m.matched_segments.slice(0,5)" :key="seg.segment">
+                                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:11px">
+                                            <div style="min-width:40px;text-align:center;font-weight:900;font-size:12px" :style="'color:' + scoreColor(seg.score)" x-text="Math.round(seg.score) + '%'"></div>
+                                            <div style="flex:1;color:var(--dim);background:var(--card2);padding:4px 8px;border-radius:6px;direction:rtl" x-text="seg.segment"></div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+            </template>
+        </div>
+
         <div class="mz-doc-layout">
             {{-- Sidebar: section index --}}
             <aside class="mz-doc-index">
@@ -158,5 +224,64 @@
             }
         }
         window.saveSection = saveSection;
+
+        function similarityPanel() {
+            return {
+                topAlert: null,
+                matches: [],
+                showPanel: false,
+                async loadResults() {
+                    try {
+                        const resp = await fetch('/api/v1/tenders/{{ $tender->id }}/similarity/results', {
+                            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                            credentials: 'same-origin',
+                        });
+                        if (!resp.ok) return;
+                        const data = await resp.json();
+                        this.topAlert = data.top_alert;
+                        this.matches = data.matches || [];
+                        if (this.topAlert && (this.topAlert.severity === 'critical' || this.topAlert.severity === 'high')) {
+                            this.showPanel = true;
+                        }
+                    } catch (e) {}
+                },
+                alertStyle() {
+                    if (!this.topAlert) return '';
+                    const colors = {
+                        critical: 'background:rgba(220,60,60,.12);border:1px solid rgba(220,60,60,.4)',
+                        high: 'background:rgba(230,150,0,.12);border:1px solid rgba(230,150,0,.4)',
+                        medium: 'background:rgba(200,169,75,.08);border:1px solid rgba(200,169,75,.3)',
+                        low: 'background:var(--card2);border:1px solid var(--borderl)',
+                    };
+                    return colors[this.topAlert.severity] || colors.low;
+                },
+                alertIcon() {
+                    if (!this.topAlert) return '';
+                    return { critical: '🔴', high: '🟠', medium: '🟡', low: '🔵' }[this.topAlert.severity] || '🔵';
+                },
+                scoreColor(score) {
+                    if (score >= 95) return '#e55';
+                    if (score >= 80) return '#e90';
+                    if (score >= 65) return 'var(--gold)';
+                    return 'var(--mute)';
+                },
+                async ignoreTender(match) {
+                    const reason = prompt('أدخل سبب تجاهل هذا التنبيه:');
+                    if (!reason || reason.length < 5) { alert('السبب مطلوب (5 أحرف على الأقل)'); return; }
+                    try {
+                        const resp = await fetch('/api/v1/tenders/{{ $tender->id }}/similarity/ignore', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'X-Requested-With': 'XMLHttpRequest' },
+                            credentials: 'same-origin',
+                            body: JSON.stringify({ matched_tender_id: match.tender_id, ignore_reason: reason }),
+                        });
+                        if (resp.ok) {
+                            this.matches = this.matches.filter(m => m.tender_id !== match.tender_id);
+                            if (this.matches.length === 0) this.topAlert = null;
+                        }
+                    } catch (e) {}
+                },
+            };
+        }
     </script>
 </x-app-layout>

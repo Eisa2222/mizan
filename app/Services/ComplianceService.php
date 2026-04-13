@@ -94,11 +94,17 @@ class ComplianceService
         // Clauses sanity check
         $clauseTypes = $tender->clauses->pluck('clause_type')->all();
         $expectedClauses = match ($tender->type) {
-            'it', 'operations' => ['sla', 'penalties', 'warranty'],
-            'construction'     => ['penalties', 'warranty', 'payment'],
-            'consulting'       => ['confidentiality', 'payment'],
-            'legal'            => ['confidentiality'],
-            default            => ['payment'],
+            'it', 'it_install'                                => ['sla', 'penalties', 'warranty'],
+            'it_supply'                                       => ['penalties', 'warranty', 'payment'],
+            'it_consulting'                                   => ['sla', 'confidentiality', 'payment'],
+            'operations', 'cleaning', 'security'              => ['sla', 'penalties', 'warranty'],
+            'construction', 'supply', 'medical_supply'        => ['penalties', 'warranty', 'payment'],
+            'consulting', 'training'                          => ['confidentiality', 'payment'],
+            'engineering_design', 'engineering_super'          => ['confidentiality', 'payment'],
+            'framework'                                       => ['sla', 'penalties', 'payment'],
+            'catering', 'transport'                           => ['sla', 'penalties', 'payment'],
+            'legal'                                           => ['confidentiality'],
+            default                                           => ['payment'],
         };
         foreach ($expectedClauses as $expected) {
             if (! in_array($expected, $clauseTypes, true)) {

@@ -58,12 +58,43 @@
                     <div class="mz-form-group">
                         <label class="mz-flabel">نوع المشروع <span style="color:var(--red)">*</span></label>
                         <select name="type" x-model="form.type" required class="mz-inp">
-                            <option value="it">مشروع تقني (IT)</option>
-                            <option value="construction">مشروع إنشاءات</option>
-                            <option value="consulting">خدمات استشارية</option>
-                            <option value="operations">تشغيل وصيانة</option>
-                            <option value="legal">خدمات قانونية</option>
+                            <optgroup label="مشاريع تقنية ورقمية">
+                                <option value="it">مشروع تقني</option>
+                                <option value="it_supply">توريد تقني وتراخيص</option>
+                                <option value="it_install">توريد وتركيب تقني</option>
+                                <option value="it_consulting">استشارات تقنية</option>
+                            </optgroup>
+                            <optgroup label="إنشاءات وهندسة">
+                                <option value="construction">مشروع إنشاءات</option>
+                                <option value="engineering_design">خدمات هندسية (تصميم)</option>
+                                <option value="engineering_super">خدمات هندسية (إشراف)</option>
+                            </optgroup>
+                            <optgroup label="خدمات استشارية وقانونية">
+                                <option value="consulting">خدمات استشارية</option>
+                                <option value="legal">خدمات قانونية</option>
+                                <option value="training">تدريب وتأهيل</option>
+                            </optgroup>
+                            <optgroup label="تشغيل وصيانة">
+                                <option value="operations">تشغيل وصيانة</option>
+                                <option value="cleaning">نظافة وخدمات بيئية</option>
+                                <option value="security">حراسة وأمن</option>
+                            </optgroup>
+                            <optgroup label="توريد">
+                                <option value="supply">توريد عام</option>
+                                <option value="medical_supply">توريد طبي</option>
+                                <option value="catering">خدمات إعاشة</option>
+                                <option value="transport">نقل ومواصلات</option>
+                            </optgroup>
+                            <optgroup label="اتفاقيات إطارية">
+                                <option value="framework">اتفاقية إطارية</option>
+                            </optgroup>
+                            <optgroup label="—">
+                                <option value="other">أخرى (حدد يدوياً)</option>
+                            </optgroup>
                         </select>
+                        <template x-if="form.type === 'other'">
+                            <input type="text" name="custom_type" x-model="form.custom_type" class="mz-inp" style="margin-top:8px" placeholder="اكتب نوع المشروع...">
+                        </template>
                     </div>
                     <div class="mz-form-group">
                         <label class="mz-flabel">المدة الزمنية <span style="font-size:10px;color:var(--mute)">(اختياري)</span></label>
@@ -78,6 +109,25 @@
                 <p style="font-size:12px;color:var(--mute);margin-bottom:14px">
                     💡 اكتب وصفاً لنطاق العمل ولو كان مختصراً. سيقوم الذكاء الاصطناعي بتوسيعه إلى مهام تفصيلية.
                 </p>
+
+                {{-- Similarity check results --}}
+                <template x-if="scopeMatches.length > 0">
+                    <div style="background:rgba(230,150,0,.1);border:1px solid rgba(230,150,0,.4);border-radius:10px;padding:12px 16px;margin-bottom:14px">
+                        <div style="font-size:13px;font-weight:700;color:#e90;margin-bottom:8px">
+                            🔍 تم العثور على <span x-text="scopeMatches.length"></span> كراسة مشابهة داخل الجهة
+                        </div>
+                        <template x-for="m in scopeMatches.slice(0,3)" :key="m.tender_id">
+                            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(230,150,0,.2)">
+                                <div>
+                                    <span style="font-size:12px;color:var(--cream);font-weight:600" x-text="m.title"></span>
+                                    <span style="font-size:11px;color:var(--mute)"> · <span x-text="m.type_label"></span> · <span x-text="m.status_label"></span></span>
+                                </div>
+                                <div style="font-size:14px;font-weight:900;color:#e90" x-text="Math.round(m.similarity_score) + '%'"></div>
+                            </div>
+                        </template>
+                        <div style="font-size:11px;color:var(--dim);margin-top:8px">يمكنك المتابعة أو فتح الكراسات السابقة للمقارنة.</div>
+                    </div>
+                </template>
                 <div class="mz-form-group">
                     <label class="mz-flabel">نطاق العمل <span style="color:var(--red)">*</span></label>
                     <textarea name="scope_input" x-model="form.scope_input" rows="8" required class="mz-inp mz-textarea" placeholder="مثال: تطوير نظام لإدارة العقود يشمل تخزين العقود، تتبع الحالة، التذكيرات، وتقارير دورية"
@@ -268,6 +318,18 @@
                 <button type="submit" x-show="step === 5" class="mz-btn mz-btn-gold" :disabled="submitting" x-text="submitting ? 'جاري التوليد...' : '✨ توليد الكراسة'"></button>
             </div>
         </form>
+
+        {{-- Full-screen loading overlay --}}
+        <template x-if="submitting">
+            <div style="position:fixed;inset:0;background:rgba(10,12,18,.92);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px">
+                <div style="width:50px;height:50px;border:4px solid var(--borderl);border-top:4px solid var(--gold);border-radius:50%;animation:spin 1s linear infinite"></div>
+                <div style="font-size:18px;font-weight:700;color:var(--cream)">جاري توليد الكراسة...</div>
+                <div style="font-size:13px;color:var(--mute);max-width:400px;text-align:center;line-height:1.7">
+                    يقوم الذكاء الاصطناعي بتوسيع نطاق العمل وتوليد الأقسام والبنود. قد تستغرق العملية حتى دقيقة.
+                </div>
+            </div>
+        </template>
+        <style>@keyframes spin { to { transform: rotate(360deg) } }</style>
     </div>
 
     <script>
@@ -282,6 +344,7 @@
                     title: '',
                     description: '',
                     type: 'it',
+                    custom_type: '',
                     duration: '',
                     scope_input: '',
                     deliverables: [''],
@@ -293,6 +356,8 @@
                     boq_items: [],
                     special_conditions: [],
                 },
+                scopeMatches: [],
+                scopeCheckTimeout: null,
                 validateStep(n) {
                     if (n === 1) {
                         this.submitted1 = true;
@@ -325,17 +390,42 @@
                     this.step = target;
                 },
                 typeLabel(t) {
+                    if (t === 'other') return this.form.custom_type || 'أخرى';
                     return {
-                        it: 'مشروع تقني',
-                        construction: 'مشروع إنشاءات',
-                        consulting: 'خدمات استشارية',
-                        operations: 'تشغيل وصيانة',
-                        legal: 'خدمات قانونية',
+                        it: 'مشروع تقني', it_supply: 'توريد تقني وتراخيص', it_install: 'توريد وتركيب تقني',
+                        it_consulting: 'استشارات تقنية', construction: 'مشروع إنشاءات',
+                        consulting: 'خدمات استشارية', operations: 'تشغيل وصيانة', legal: 'خدمات قانونية',
+                        supply: 'توريد عام', medical_supply: 'توريد طبي', framework: 'اتفاقية إطارية',
+                        engineering_design: 'خدمات هندسية (تصميم)', engineering_super: 'خدمات هندسية (إشراف)',
+                        cleaning: 'نظافة وخدمات بيئية', catering: 'خدمات إعاشة',
+                        transport: 'نقل ومواصلات', training: 'تدريب وتأهيل', security: 'حراسة وأمن',
                     }[t] || t;
+                },
+                async checkScopeSimilarity() {
+                    const scope = this.form.scope_input.trim();
+                    if (scope.length < 15) { this.scopeMatches = []; return; }
+                    try {
+                        const token = document.querySelector('meta[name="csrf-token"]')?.content;
+                        const resp = await fetch('/api/v1/tenders/similarity/check-scope', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': token, 'X-Requested-With': 'XMLHttpRequest' },
+                            credentials: 'same-origin',
+                            body: JSON.stringify({ scope_text: scope, type: this.form.type }),
+                        });
+                        if (resp.ok) {
+                            const data = await resp.json();
+                            this.scopeMatches = data.matches || [];
+                        }
+                    } catch (e) {}
                 },
                 init() {
                     this.$watch('step', () => { this.stepError = ''; });
                     this.$el.closest('form')?.addEventListener('submit', () => { this.submitting = true; });
+                    // Auto-check similarity when scope text changes (debounced)
+                    this.$watch('form.scope_input', () => {
+                        clearTimeout(this.scopeCheckTimeout);
+                        this.scopeCheckTimeout = setTimeout(() => this.checkScopeSimilarity(), 1500);
+                    });
                 },
             };
         }

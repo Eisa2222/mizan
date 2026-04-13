@@ -89,7 +89,7 @@ class ImportLegalBatch extends Command
             }
 
             $ext = strtolower(pathinfo($entry, PATHINFO_EXTENSION));
-            if (! in_array($ext, ['pdf', 'docx', 'doc', 'txt', 'jpg', 'jpeg', 'png'], true)) continue;
+            if (! in_array($ext, ['pdf', 'docx', 'doc', 'txt', 'xlsx', 'xls', 'jpg', 'jpeg', 'png'], true)) continue;
 
             // Skip non-PDF twin if PDF exists
             if (in_array($ext, ['docx', 'doc'], true) && isset($pdfBasenames[pathinfo($entry, PATHINFO_FILENAME)])) {
@@ -137,7 +137,11 @@ class ImportLegalBatch extends Command
             // Extract text (skip for images — they'd need OCR)
             $content = null;
             if (! $isImage) {
-                $content = $extractor->extract(Storage::disk('public')->path($storedName));
+                try {
+                    $content = $extractor->extract(Storage::disk('public')->path($storedName));
+                } catch (\Throwable $ex) {
+                    $this->warn("     ⚠ استخراج النص فشل: " . mb_substr($ex->getMessage(), 0, 100));
+                }
             }
 
             if ($content !== null && $content !== '') {

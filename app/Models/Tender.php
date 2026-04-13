@@ -12,7 +12,7 @@ class Tender extends Model
     protected $fillable = [
         'org_id', 'created_by', 'title', 'description', 'scope_input',
         'type', 'duration', 'deliverables', 'evaluation_criteria',
-        'special_conditions', 'boq_items', 'expanded_scope', 'status',
+        'special_conditions', 'boq_items', 'expanded_scope', 'normalized_scope', 'status',
     ];
 
     protected $casts = [
@@ -25,11 +25,32 @@ class Tender extends Model
 
     /** Project type → Arabic label */
     public const TYPES = [
-        'it'           => 'مشروع تقني',
-        'construction' => 'مشروع إنشاءات',
-        'consulting'   => 'خدمات استشارية',
-        'operations'   => 'تشغيل وصيانة',
-        'legal'        => 'خدمات قانونية',
+        // تقنية
+        'it'                 => 'مشروع تقني',
+        'it_supply'          => 'توريد تقني وتراخيص',
+        'it_install'         => 'توريد وتركيب تقني',
+        'it_consulting'      => 'استشارات تقنية',
+        // إنشاءات وهندسة
+        'construction'       => 'مشروع إنشاءات',
+        'engineering_design' => 'خدمات هندسية (تصميم)',
+        'engineering_super'  => 'خدمات هندسية (إشراف)',
+        // استشارات
+        'consulting'         => 'خدمات استشارية',
+        'legal'              => 'خدمات قانونية',
+        'training'           => 'تدريب وتأهيل',
+        // تشغيل وصيانة
+        'operations'         => 'تشغيل وصيانة',
+        'cleaning'           => 'نظافة وخدمات بيئية',
+        'security'           => 'حراسة وأمن',
+        // توريد
+        'supply'             => 'توريد عام',
+        'medical_supply'     => 'توريد طبي',
+        'catering'           => 'خدمات إعاشة',
+        'transport'          => 'نقل ومواصلات',
+        // اتفاقيات
+        'framework'          => 'اتفاقية إطارية',
+        // أخرى
+        'other'              => 'أخرى',
     ];
 
     public const STATUSES = [
@@ -63,6 +84,11 @@ class Tender extends Model
     public function review(): HasOne
     {
         return $this->hasOne(TenderReview::class)->latestOfMany();
+    }
+
+    public function similarityResults(): HasMany
+    {
+        return $this->hasMany(TenderSimilarityResult::class, 'source_tender_id')->orderByDesc('final_similarity_score');
     }
 
     public function getTypeLabelAttribute(): string

@@ -48,7 +48,7 @@ class ScopeAnalyzerService
         $system = 'أنت محلل نطاق مشاريع حكومية سعودي. مهمتك توسيع نطاق العمل المختصر إلى مهام تفصيلية.'
             . "\nأرجع JSON فقط بالعربية بهذا الشكل:"
             . "\n" . '{"tasks":["مهمة 1","مهمة 2"],"detected_type":"it","deliverables":["مخرج 1"],"missing":["معلومة ناقصة"],"summary":"وصف موسّع"}'
-            . "\ndetected_type يكون إحدى: it, construction, consulting, operations, legal"
+            . "\ndetected_type يكون إحدى: " . implode(', ', array_keys(\App\Models\Tender::TYPES))
             . "\nاكتب 5-10 مهام تفصيلية ومنطقية. اكتب 3-6 مخرجات. اكتب 2-5 معلومات ناقصة. كل النصوص بالعربية.";
 
         $user = $title . $hint . "نطاق العمل المختصر:\n" . $rawScope;

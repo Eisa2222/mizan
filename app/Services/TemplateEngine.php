@@ -23,13 +23,25 @@ class TemplateEngine
     /** Available template types and their Arabic labels. */
     public function availableTypes(): array
     {
-        return [
-            'it'           => 'مشروع تقني',
-            'construction' => 'مشروع إنشاءات',
-            'consulting'   => 'خدمات استشارية',
-            'operations'   => 'تشغيل وصيانة',
-            'legal'        => 'خدمات قانونية',
-        ];
+        return \App\Models\Tender::TYPES;
+    }
+
+    /**
+     * Map extended types to their base template file.
+     * New types that don't have their own JSON file fall back to a close match.
+     */
+    public function resolveTemplateFile(string $type): string
+    {
+        return match ($type) {
+            'it_supply', 'it_install', 'it_consulting'           => 'it',
+            'supply', 'medical_supply', 'catering', 'transport'  => 'construction',
+            'framework'                                          => 'consulting',
+            'engineering_design', 'engineering_super'             => 'construction',
+            'cleaning', 'security'                               => 'operations',
+            'training'                                           => 'consulting',
+            'other'                                              => 'it',
+            default                                              => $type,
+        };
     }
 
     /**
@@ -39,7 +51,8 @@ class TemplateEngine
      */
     public function load(string $type): array
     {
-        $file = $this->templatesPath . DIRECTORY_SEPARATOR . $type . '.json';
+        $resolved = $this->resolveTemplateFile($type);
+        $file = $this->templatesPath . DIRECTORY_SEPARATOR . $resolved . '.json';
         if (! is_file($file)) {
             throw new RuntimeException("Template not found: {$type}");
         }

@@ -53,9 +53,14 @@ class LegalDocumentPolicy
         return $doc->is_private ? $this->canSeePrivate($user, $doc) : true;
     }
 
+    /**
+     * Only Researcher+ can upload legal documents.
+     * OrgUser role has access to all other services (tenders, contracts,
+     * memos, cases) but NOT legal document upload.
+     */
     public function create(User $user): bool
     {
-        return $user->hasAtLeastRole(UserRole::Researcher);
+        return $user->role?->canUploadDocuments() ?? false;
     }
 
     public function update(User $user, LegalDocument $doc): bool

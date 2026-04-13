@@ -104,11 +104,25 @@ class ClauseService
 
     /** Default clause set per project type. */
     private const TYPE_CLAUSES = [
-        'it'           => ['sla', 'penalties', 'confidentiality', 'data_protection', 'warranty', 'payment', 'ip', 'support', 'termination'],
-        'construction' => ['penalties', 'warranty', 'payment', 'termination'],
-        'consulting'   => ['confidentiality', 'ip', 'payment', 'termination'],
-        'operations'   => ['sla', 'penalties', 'warranty', 'payment', 'support', 'termination'],
-        'legal'        => ['confidentiality', 'payment', 'termination'],
+        'it'                 => ['sla', 'penalties', 'confidentiality', 'data_protection', 'warranty', 'payment', 'ip', 'support', 'termination'],
+        'it_supply'          => ['penalties', 'warranty', 'payment', 'data_protection', 'support', 'termination'],
+        'it_install'         => ['sla', 'penalties', 'warranty', 'payment', 'data_protection', 'support', 'termination'],
+        'it_consulting'      => ['sla', 'confidentiality', 'ip', 'payment', 'termination'],
+        'other'              => ['penalties', 'payment', 'termination'],
+        'construction'       => ['penalties', 'warranty', 'payment', 'termination'],
+        'consulting'         => ['confidentiality', 'ip', 'payment', 'termination'],
+        'operations'         => ['sla', 'penalties', 'warranty', 'payment', 'support', 'termination'],
+        'legal'              => ['confidentiality', 'payment', 'termination'],
+        'supply'             => ['penalties', 'warranty', 'payment', 'termination'],
+        'medical_supply'     => ['penalties', 'warranty', 'payment', 'termination', 'sla'],
+        'framework'          => ['sla', 'penalties', 'confidentiality', 'payment', 'termination'],
+        'engineering_design' => ['confidentiality', 'ip', 'payment', 'termination', 'warranty'],
+        'engineering_super'  => ['sla', 'penalties', 'payment', 'termination'],
+        'cleaning'           => ['sla', 'penalties', 'payment', 'termination'],
+        'catering'           => ['sla', 'penalties', 'payment', 'termination'],
+        'transport'          => ['sla', 'penalties', 'payment', 'termination'],
+        'training'           => ['confidentiality', 'payment', 'termination'],
+        'security'           => ['sla', 'penalties', 'confidentiality', 'payment', 'termination'],
     ];
 
     /** Get all available clause types as key => Arabic title. */

@@ -17,6 +17,9 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RelationController;
 use App\Http\Controllers\SearchPageController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\AdminController;
+use App\Http\Controllers\Api\SimilarityController;
+use App\Http\Controllers\BrandingController;
 use App\Http\Controllers\TenderController;
 use App\Http\Controllers\VersionController;
 use App\Http\Controllers\WatchlistController;
@@ -51,6 +54,20 @@ Route::middleware('auth')->group(function () {
     Route::post('/memos', [MemoController::class, 'store'])->name('memos.store');
     Route::get('/memos/{document}', [MemoController::class, 'show'])->name('memos.show');
 
+    // Admin Panel (SuperAdmin only)
+    Route::get('/admin/organizations', [AdminController::class, 'organizations'])->name('admin.organizations');
+    Route::get('/admin/organizations/create', [AdminController::class, 'createOrganization'])->name('admin.organizations.create');
+    Route::post('/admin/organizations', [AdminController::class, 'storeOrganization'])->name('admin.organizations.store');
+    Route::get('/admin/users', [AdminController::class, 'users'])->name('admin.users');
+    Route::get('/admin/users/create', [AdminController::class, 'createUser'])->name('admin.users.create');
+    Route::post('/admin/users', [AdminController::class, 'storeUser'])->name('admin.users.store');
+    Route::patch('/admin/users/{user}/role', [AdminController::class, 'updateUserRole'])->name('admin.users.update-role');
+
+    // Organization Branding (هوية المؤسسة)
+    Route::get('/branding', [BrandingController::class, 'edit'])->name('branding.edit');
+    Route::put('/branding', [BrandingController::class, 'update'])->name('branding.update');
+    Route::delete('/branding/logo', [BrandingController::class, 'removeLogo'])->name('branding.remove-logo');
+
     // GPC Knowledge Base (نظام المنافسات + اللائحة + الأدلة)
     Route::get('/gpc-knowledge', [GpcKnowledgeController::class, 'index'])->name('gpc-knowledge.index');
 
@@ -65,6 +82,14 @@ Route::middleware('auth')->group(function () {
     Route::get('/tenders/{tender}/export/pdf', [TenderController::class, 'exportPdf'])->name('tenders.export.pdf');
     Route::get('/tenders/{tender}/export/docx', [TenderController::class, 'exportDocx'])->name('tenders.export.docx');
     Route::delete('/tenders/{tender}', [TenderController::class, 'destroy'])->name('tenders.destroy');
+
+    // Tender Similarity API
+    Route::post('/api/v1/tenders/{tender}/similarity/analyze', [SimilarityController::class, 'analyze'])->name('api.similarity.analyze');
+    Route::post('/api/v1/tenders/similarity/check-scope', [SimilarityController::class, 'checkScope'])->name('api.similarity.check-scope');
+    Route::get('/api/v1/tenders/{tender}/similarity/results', [SimilarityController::class, 'results'])->name('api.similarity.results');
+    Route::get('/api/v1/tenders/{tender}/similarity/compare/{matchedTender}', [SimilarityController::class, 'compare'])->name('api.similarity.compare');
+    Route::post('/api/v1/tenders/{tender}/similarity/ignore', [SimilarityController::class, 'ignore'])->name('api.similarity.ignore');
+    Route::post('/api/v1/tenders/{tender}/reuse/{matchedTender}', [SimilarityController::class, 'reuse'])->name('api.similarity.reuse');
 
     // Tender Reviews (كراسات الشروط والمواصفات)
     Route::get('/tender-reviews', [TenderReviewController::class, 'index'])->name('tender-reviews.index');

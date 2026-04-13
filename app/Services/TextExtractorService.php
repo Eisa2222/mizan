@@ -28,11 +28,12 @@ class TextExtractorService
         $ext = strtolower(pathinfo($absolutePath, PATHINFO_EXTENSION));
 
         $text = match ($ext) {
-            'pdf'  => $this->extractPdf($absolutePath),
-            'docx' => $this->extractDocx($absolutePath),
-            'doc'  => null,
-            'txt'  => $this->extractTxt($absolutePath),
-            default => null,
+            'pdf'        => $this->extractPdf($absolutePath),
+            'docx'       => $this->extractDocx($absolutePath),
+            'xlsx','xls' => $this->extractXlsx($absolutePath),
+            'doc'        => null,
+            'txt'        => $this->extractTxt($absolutePath),
+            default      => null,
         };
 
         // Quality check — reject mojibake / garbled Arabic
@@ -86,6 +87,9 @@ class TextExtractorService
 
     private function extractPdf(string $path): ?string
     {
+        // Skip very large PDFs that exhaust memory with smalot/pdfparser
+        if (filesize($path) > 30 * 1024 * 1024) return null; // 30MB limit
+
         try {
             $parser = new PdfParser();
             $pdf = $parser->parseFile($path);
@@ -346,6 +350,43 @@ class TextExtractorService
         }
 
         return $this->cleanup($raw);
+    }
+
+    /**
+     * Extract text from Excel (.xlsx/.xls) files via PhpSpreadsheet.
+     * Reads all sheets and joins cell values with tabs/newlines.
+     */
+    private function extractXlsx(string $path): ?string
+    {
+        // Skip large Excel files that exhaust memory with PhpSpreadsheet
+        if (filesize($path) > 2 * 1024 * 1024) return null; // 2MB limit
+
+        try {
+            $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReaderForFile($path);
+            $reader->setReadDataOnly(true);
+            $spreadsheet = $reader->load($path);
+            $lines = [];
+            foreach ($spreadsheet->getAllSheets() as $sheet) {
+                $sheetName = $sheet->getTitle();
+                if ($spreadsheet->getSheetCount() > 1) {
+                    $lines[] = "═══ {$sheetName} ═══";
+                }
+                foreach ($sheet->getRowIterator() as $row) {
+                    $cells = [];
+                    foreach ($row->getCellIterator() as $cell) {
+                        $val = trim((string) $cell->getFormattedValue());
+                        if ($val !== '') $cells[] = $val;
+                    }
+                    if (! empty($cells)) {
+                        $lines[] = implode("\t", $cells);
+                    }
+                }
+            }
+            $text = implode("\n", $lines);
+            return $text !== '' ? $this->cleanup($text) : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     /** Trim, collapse runs of whitespace, normalize line endings. */

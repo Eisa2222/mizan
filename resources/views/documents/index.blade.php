@@ -5,7 +5,9 @@
                 <div class="mz-page-title">المستندات القانونية</div>
                 <div class="mz-page-sub">{{ $documents->total() }} مستند · بحث ذكي وفلترة</div>
             </div>
-            <a href="{{ route('documents.create') }}" class="mz-btn mz-btn-gold">+ رفع مستند</a>
+            @can('create', \App\Models\LegalDocument::class)
+                <a href="{{ route('documents.create') }}" class="mz-btn mz-btn-gold">+ رفع مستند</a>
+            @endcan
         </div>
 
         {{-- Search box --}}

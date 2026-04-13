@@ -7,7 +7,19 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Organization extends Model
 {
-    protected $fillable = ['name_ar', 'name_en', 'domain'];
+    protected $fillable = [
+        'name_ar', 'name_en', 'domain',
+        'logo_path', 'header_text', 'footer_text',
+        'primary_color', 'accent_color',
+        'phone', 'email', 'website', 'address',
+    ];
+
+    public function getLogoUrlAttribute(): ?string
+    {
+        return $this->logo_path
+            ? asset('storage/' . $this->logo_path)
+            : null;
+    }
 
     public function users(): HasMany
     {

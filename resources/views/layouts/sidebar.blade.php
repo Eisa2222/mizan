@@ -54,6 +54,21 @@
         @endif
     </a>
 
+    @if (auth()->user()?->hasRole(\App\Enums\UserRole::SuperAdmin))
+        <div class="mz-nav-section" style="margin-top:8px">لوحة المدير</div>
+        <a href="{{ route('admin.organizations') }}" class="mz-nav-item {{ request()->routeIs('admin.organizations*') ? 'active' : '' }}">
+            <span class="mz-ni">🏢</span> إدارة الجهات
+        </a>
+        <a href="{{ route('admin.users') }}" class="mz-nav-item {{ request()->routeIs('admin.users*') ? 'active' : '' }}">
+            <span class="mz-ni">👥</span> إدارة المستخدمين
+        </a>
+    @endif
+
+    <div class="mz-nav-section" style="margin-top:8px">الإعدادات</div>
+    <a href="{{ route('branding.edit') }}" class="mz-nav-item {{ request()->routeIs('branding.*') ? 'active' : '' }}">
+        <span class="mz-ni">🎨</span> هوية المؤسسة
+    </a>
+
     <div style="margin-top:auto;padding:12px;border-top:1px solid var(--borderl)">
         <div style="font-size:10px;color:var(--mute);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">المؤسسة</div>
         <div style="font-size:12px;color:var(--cream);font-weight:600">{{ auth()->user()?->organization?->name_ar ?? '—' }}</div>

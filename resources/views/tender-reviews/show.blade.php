@@ -36,7 +36,60 @@
             <div class="mz-notice mz-notice-error"><div class="mz-notice-title">⚠ فشل المراجعة</div><div class="mz-notice-body">{{ $document->metadata['analysis_error'] ?? 'خطأ.' }}</div></div>
         @elseif (!$hasAnalysis)
             <div class="mz-notice mz-notice-warn"><div class="mz-notice-title">⏳ جاري المراجعة</div><div class="mz-notice-body">يقوم النظام بفحص الكراسة. حدّث الصفحة بعد دقيقة.</div></div>
-        @else
+        @endif
+
+        {{-- ═══ Similarity Matches (always visible, independent of AI review) ═══ --}}
+        @php $simMatches = $document->metadata['similarity_matches'] ?? []; @endphp
+        @if (count($simMatches) > 0)
+            @php $topMatch = $simMatches[0]; @endphp
+            <div style="margin-bottom:16px" x-data="{ showSim: {{ $topMatch['similarity_score'] >= 80 ? 'true' : 'false' }} }">
+                <div class="mz-card" style="padding:14px 18px;{{ $topMatch['duplicate_risk'] ?? false ? 'background:rgba(220,60,60,.12);border:1px solid rgba(220,60,60,.4)' : ($topMatch['similarity_score'] >= 80 ? 'background:rgba(230,150,0,.1);border:1px solid rgba(230,150,0,.4)' : 'background:rgba(200,169,75,.08);border:1px solid rgba(200,169,75,.3)') }}">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                        <div>
+                            @if ($topMatch['duplicate_risk'] ?? false)
+                                <span style="font-size:18px">🔴</span>
+                                <span style="font-weight:700;color:#e55">تحذير: كراسة مطابقة أو شبه مطابقة موجودة سابقاً ({{ round($topMatch['similarity_score']) }}%)!</span>
+                            @elseif ($topMatch['similarity_score'] >= 80)
+                                <span style="font-size:18px">🟠</span>
+                                <span style="font-weight:700;color:#e90">تم العثور على {{ count($simMatches) }} كراسة مشابهة — أعلى تطابق {{ round($topMatch['similarity_score']) }}%</span>
+                            @else
+                                <span style="font-size:18px">🟡</span>
+                                <span style="font-weight:700;color:var(--gold)">{{ count($simMatches) }} كراسة مشابهة سابقة — يمكن الاستفادة منها</span>
+                            @endif
+                        </div>
+                        <button @click="showSim = !showSim" class="mz-btn mz-btn-ghost mz-btn-sm" x-text="showSim ? 'إخفاء' : 'عرض التفاصيل'"></button>
+                    </div>
+                </div>
+                <div x-show="showSim" x-transition style="margin-top:8px">
+                    @foreach ($simMatches as $sm)
+                        <div class="mz-card" style="padding:12px 16px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+                            <div style="flex:1">
+                                <div style="font-size:13px;font-weight:700;color:var(--cream)">{{ $sm['title'] }}</div>
+                                <div style="font-size:11px;color:var(--mute);margin-top:2px">
+                                    {{ $sm['type_label'] }} · {{ $sm['status'] }}
+                                    @if ($sm['compliance_score'] ?? null) · امتثال: <span style="color:var(--gold)">{{ $sm['compliance_score'] }}%</span> @endif
+                                </div>
+                                @if (! empty($sm['lessons_learned']))
+                                    <div style="font-size:11px;color:var(--dim);margin-top:4px">
+                                        <span style="color:var(--gold)">دروس مستفادة:</span>
+                                        @foreach (array_slice($sm['lessons_learned'], 0, 3) as $l)
+                                            <div style="margin-top:2px">· {{ $l }}</div>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </div>
+                            <div style="text-align:center;min-width:80px">
+                                <div style="font-size:22px;font-weight:900;color:{{ ($sm['duplicate_risk'] ?? false) ? '#e55' : ($sm['similarity_score'] >= 80 ? '#e90' : 'var(--gold)') }}">{{ round($sm['similarity_score']) }}%</div>
+                                <div style="font-size:10px;color:var(--mute)">تشابه</div>
+                            </div>
+                            <a href="{{ $sm['url'] ?? '#' }}" target="_blank" class="mz-btn mz-btn-ghost mz-btn-sm" style="font-size:11px">فتح الكراسة</a>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
+        @if ($hasAnalysis)
             {{-- ═══ Compliance Dashboard ═══ --}}
             <div style="display:grid;grid-template-columns:200px 1fr;gap:16px;margin-bottom:20px">
                 {{-- Score circle --}}
