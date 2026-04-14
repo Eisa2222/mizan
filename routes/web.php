@@ -81,6 +81,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/tenders/{tender}/review', [TenderController::class, 'review'])->name('tenders.review');
     Route::get('/tenders/{tender}/export/pdf', [TenderController::class, 'exportPdf'])->name('tenders.export.pdf');
     Route::get('/tenders/{tender}/export/docx', [TenderController::class, 'exportDocx'])->name('tenders.export.docx');
+    Route::post('/tenders/{tender}/submit', [TenderController::class, 'submit'])->name('tenders.submit');
+    Route::post('/tenders/{tender}/approve', [TenderController::class, 'approve'])->name('tenders.approve');
+    Route::post('/tenders/{tender}/reject', [TenderController::class, 'reject'])->name('tenders.reject');
     Route::delete('/tenders/{tender}', [TenderController::class, 'destroy'])->name('tenders.destroy');
 
     // Tender Similarity API

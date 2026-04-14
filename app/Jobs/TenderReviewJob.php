@@ -72,26 +72,20 @@ class TenderReviewJob implements ShouldQueue
         $summary = [];
         $lastError = '';
 
-        // Get findings — use chat() then extract JSON manually.
-        // chatJson() forces Ollama JSON mode which oversimplifies responses.
-        for ($attempt = 1; $attempt <= 2; $attempt++) {
+        // Get findings — try up to 3 attempts with flexible parsing.
+        // Ollama sometimes returns different JSON shapes (findings/suggestions/issues/etc).
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
             try {
                 $raw = $claude->chat(
-                    messages: [['role' => 'user', 'content' => "راجع كراسة الشروط والمواصفات التالية والتزم بالهرم الأربعي للسند.\n\nالكراسة:\n" . mb_substr($content, 0, 8000)]],
+                    messages: [['role' => 'user', 'content' => "راجع كراسة الشروط والمواصفات التالية والتزم بالهرم الأربعي للسند. ارجع JSON بهذا الشكل بالضبط: {\"findings\":[{\"issue_title\":\"...\",\"severity\":\"Critical|High|Medium|Improvement\",\"why_it_is_an_issue\":\"...\",\"recommendation\":\"...\"}]}\n\nالكراسة:\n" . mb_substr($content, 0, 8000)]],
                     system: $findingsSystem,
                     maxTokens: 4000,
                 );
                 $text = $raw['text'];
-                Log::info("TenderReviewJob findings raw", ['text_len' => mb_strlen($text), 'preview' => mb_substr($text, 0, 200)]);
-                // Extract JSON from response
-                if (preg_match('/\{[\s\S]*\}/u', $text, $m)) {
-                    $decoded = json_decode($m[0], true);
-                    if (is_array($decoded)) {
-                        $findings = $decoded['findings'] ?? [];
-                        if (isset($decoded['category'])) $findings = [$decoded];
-                        if (!empty($findings)) break;
-                    }
-                }
+                Log::info("TenderReviewJob findings raw", ['attempt' => $attempt, 'text_len' => mb_strlen($text), 'preview' => mb_substr($text, 0, 200)]);
+
+                $findings = $this->extractFindingsFromResponse($text);
+                if (!empty($findings)) break;
             } catch (Throwable $e) {
                 $lastError = $e->getMessage();
                 Log::warning("TenderReviewJob findings attempt $attempt failed", ['error' => $lastError]);
@@ -138,30 +132,39 @@ class TenderReviewJob implements ShouldQueue
         // Normalize each finding: accept both the old schema (category/title/issue)
         // and the new governance schema (issue_title, basis_type, basis_reference).
         $findings = array_map(function ($f) {
+            $sevEn = $this->normalizeSeverity($f['severity'] ?? 'Medium');
+            $basisType = $f['basis_type'] ?? 'law';
             return [
                 'issue_title'        => $f['issue_title'] ?? $f['title'] ?? '',
-                'severity'           => $this->normalizeSeverity($f['severity'] ?? 'Medium'),
+                'severity'           => $sevEn, // English for logic (Critical/High/Medium/Improvement)
+                'severity_label'     => $this->severityLabel($sevEn), // Arabic for display
                 'affected_section'   => $f['affected_section'] ?? $f['category'] ?? '',
                 'detected_text'      => $f['detected_text'] ?? '',
                 'why_it_is_an_issue' => $f['why_it_is_an_issue'] ?? $f['issue'] ?? '',
-                'basis_type'         => $f['basis_type'] ?? 'law',
+                'basis_type'         => $basisType,
                 'basis_reference'    => $f['basis_reference'] ?? $f['legal_reference'] ?? '',
                 'violation_type'     => $f['violation_type'] ?? null,
                 'recommendation'     => $f['recommendation'] ?? '',
                 'suggested_rewrite'  => $f['suggested_rewrite'] ?? '',
-                // Back-compat keys for existing views
+                // Back-compat keys for existing views (Arabic labels)
                 'title'              => $f['issue_title'] ?? $f['title'] ?? '',
-                'category'           => $f['basis_type'] ?? $f['category'] ?? '',
+                'category'           => $this->categoryLabel($basisType),
                 'issue'              => $f['why_it_is_an_issue'] ?? $f['issue'] ?? '',
                 'legal_reference'    => $f['basis_reference'] ?? $f['legal_reference'] ?? '',
             ];
         }, $findings);
 
-        // Count by severity (normalized English keys)
-        $critical    = collect($findings)->where('severity', 'Critical')->count();
-        $high        = collect($findings)->where('severity', 'High')->count();
-        $medium      = collect($findings)->where('severity', 'Medium')->count();
-        $improvement = collect($findings)->where('severity', 'Improvement')->count();
+        // Override severity with Arabic labels for view compatibility
+        $findings = array_map(function ($f) {
+            $f['severity'] = $f['severity_label']; // Replace English with Arabic
+            return $f;
+        }, $findings);
+
+        // Count by severity (using Arabic labels now)
+        $critical    = collect($findings)->where('severity', 'حرجة')->count();
+        $high        = collect($findings)->where('severity', 'عالية')->count();
+        $medium      = collect($findings)->where('severity', 'متوسطة')->count();
+        $improvement = collect($findings)->where('severity', 'تحسينية')->count();
 
         $document->analysis = [
             'compliance_score'    => $summary['compliance_score'] ?? $summary['overall_score'] ?? 70,
@@ -189,6 +192,103 @@ class TenderReviewJob implements ShouldQueue
             body: "نسبة الامتثال: {$score}% · {$findingsCount} ملاحظة — افتح الكراسة لعرض التقرير.",
             data: ['document_id' => $document->id]
         );
+    }
+
+    /**
+     * Extract findings from AI response — handles multiple JSON shapes.
+     * Accepts any of: findings/issues/suggestions/problems/observations/recommendations
+     * as the array key. Also handles nested responses.
+     */
+    private function extractFindingsFromResponse(string $text): array
+    {
+        // Strip code fences
+        $text = preg_replace('/```(?:json)?\s*/iu', '', $text) ?? $text;
+        $text = preg_replace('/```/u', '', $text) ?? $text;
+
+        if (! preg_match('/\{[\s\S]*\}/u', $text, $m)) return [];
+
+        $decoded = json_decode($m[0], true);
+        if (! is_array($decoded)) return [];
+
+        // Try common keys
+        $candidateKeys = ['findings', 'issues', 'suggestions', 'problems', 'observations', 'recommendations', 'notes', 'remarks'];
+        foreach ($candidateKeys as $key) {
+            if (isset($decoded[$key]) && is_array($decoded[$key]) && !empty($decoded[$key])) {
+                return $this->normalizeFindings($decoded[$key]);
+            }
+        }
+
+        // Sometimes the response wraps findings in a nested object
+        foreach ($decoded as $value) {
+            if (is_array($value)) {
+                foreach ($candidateKeys as $key) {
+                    if (isset($value[$key]) && is_array($value[$key]) && !empty($value[$key])) {
+                        return $this->normalizeFindings($value[$key]);
+                    }
+                }
+            }
+        }
+
+        // Single finding object (has issue/title directly)
+        if (isset($decoded['issue_title']) || isset($decoded['issue']) || isset($decoded['title'])) {
+            return $this->normalizeFindings([$decoded]);
+        }
+
+        // Array of finding-like objects at root
+        if (array_is_list($decoded) && !empty($decoded) && is_array($decoded[0])) {
+            return $this->normalizeFindings($decoded);
+        }
+
+        return [];
+    }
+
+    /** Normalize finding entries regardless of original key names. */
+    private function normalizeFindings(array $rawFindings): array
+    {
+        return array_values(array_filter(array_map(function ($f) {
+            if (! is_array($f)) return null;
+            $title = $f['issue_title'] ?? $f['title'] ?? $f['issue'] ?? $f['name'] ?? $f['problem'] ?? '';
+            $issue = $f['why_it_is_an_issue'] ?? $f['issue'] ?? $f['description'] ?? $f['problem'] ?? $f['reason'] ?? '';
+            $severity = $f['severity'] ?? $f['priority'] ?? $f['level'] ?? 'Medium';
+            $recommendation = $f['recommendation'] ?? $f['suggestion'] ?? $f['fix'] ?? $f['solution'] ?? '';
+            if ($title === '' && $issue === '') return null;
+            return [
+                'issue_title'        => $title,
+                'severity'           => $severity,
+                'affected_section'   => $f['affected_section'] ?? $f['section'] ?? $f['category'] ?? '',
+                'detected_text'      => $f['detected_text'] ?? $f['text'] ?? '',
+                'why_it_is_an_issue' => $issue,
+                'basis_type'         => $f['basis_type'] ?? 'law',
+                'basis_reference'    => $f['basis_reference'] ?? $f['legal_reference'] ?? $f['reference'] ?? '',
+                'violation_type'     => $f['violation_type'] ?? null,
+                'recommendation'     => $recommendation,
+                'suggested_rewrite'  => $f['suggested_rewrite'] ?? $f['suggested'] ?? '',
+            ];
+        }, $rawFindings)));
+    }
+
+    /** Map English severity to Arabic label used in views. */
+    private function severityLabel(string $sevEn): string
+    {
+        return match ($sevEn) {
+            'Critical'    => 'حرجة',
+            'High'        => 'عالية',
+            'Medium'      => 'متوسطة',
+            'Improvement' => 'تحسينية',
+            default       => 'متوسطة',
+        };
+    }
+
+    /** Map basis_type to Arabic category used in views (نظامي/شكلي/موضوعي/عدالة). */
+    private function categoryLabel(string $basisType): string
+    {
+        return match (mb_strtolower($basisType)) {
+            'law', 'regulation', 'نظامي'      => 'نظامي',
+            'template', 'procedure', 'شكلي'    => 'شكلي',
+            'guide', 'recommendation', 'policy', 'موضوعي' => 'موضوعي',
+            'fairness', 'عدالة'                => 'عدالة',
+            default                             => 'موضوعي',
+        };
     }
 
     private function normalizeSeverity(string $sev): string

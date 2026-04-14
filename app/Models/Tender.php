@@ -13,6 +13,7 @@ class Tender extends Model
         'org_id', 'created_by', 'title', 'description', 'scope_input',
         'type', 'duration', 'deliverables', 'evaluation_criteria',
         'special_conditions', 'boq_items', 'expanded_scope', 'normalized_scope', 'status',
+        'workflow_status', 'submitted_by', 'submitted_at', 'approved_by', 'approved_at', 'rejection_reason',
     ];
 
     protected $casts = [
@@ -21,6 +22,8 @@ class Tender extends Model
         'special_conditions' => 'array',
         'boq_items' => 'array',
         'expanded_scope' => 'array',
+        'submitted_at' => 'datetime',
+        'approved_at' => 'datetime',
     ];
 
     /** Project type → Arabic label */
@@ -61,6 +64,14 @@ class Tender extends Model
         'finalized'  => 'معتمد',
     ];
 
+    /** Workflow: منشئ → معتمد */
+    public const WORKFLOW = [
+        'draft'     => 'مسودة',
+        'submitted' => 'مرسل للاعتماد',
+        'approved'  => 'معتمد',
+        'rejected'  => 'مرفوض',
+    ];
+
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class, 'org_id');
@@ -89,6 +100,21 @@ class Tender extends Model
     public function similarityResults(): HasMany
     {
         return $this->hasMany(TenderSimilarityResult::class, 'source_tender_id')->orderByDesc('final_similarity_score');
+    }
+
+    public function submitter(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'submitted_by');
+    }
+
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function getWorkflowLabelAttribute(): string
+    {
+        return self::WORKFLOW[$this->workflow_status] ?? '—';
     }
 
     public function getTypeLabelAttribute(): string

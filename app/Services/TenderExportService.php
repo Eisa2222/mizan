@@ -30,7 +30,11 @@ class TenderExportService
                 ->format('A4')
                 ->margins(20, 20, 25, 20)
                 ->showBackground()
+                ->noSandbox()
+                ->setOption('args', ['--lang=ar-SA', '--font-render-hinting=medium'])
                 ->waitUntilNetworkIdle()
+                // Extra wait to let Google Fonts Arabic load + shape correctly
+                ->setDelay(2000)
                 ->save($absPath);
         } catch (Throwable $e) {
             file_put_contents(storage_path('app/public/tenders/' . $tender->id . '.html'), $html);
@@ -48,10 +52,17 @@ class TenderExportService
         $accentColor = ltrim($org?->accent_color ?? '#c8a94b', '#');
 
         $word = new PhpWord();
-        $word->getSettings()->setThemeFontLang(new Language('ar-SA'));
-        $word->setDefaultParagraphStyle(['align' => 'right', 'spaceAfter' => 200]);
-        $word->setDefaultFontName('Arial');
-        $word->setDefaultFontSize(11);
+        // Force RTL language + Arabic complex-script support at document level
+        $lang = new Language('ar-SA', 'ar-SA', 'ar-SA');
+        $word->getSettings()->setThemeFontLang($lang);
+        $word->setDefaultParagraphStyle([
+            'align' => 'right',
+            'spaceAfter' => 200,
+            'bidi' => true, // RTL direction for all paragraphs by default
+        ]);
+        // Use Amiri/Traditional Arabic — better Arabic shaping than Arial
+        $word->setDefaultFontName('Traditional Arabic');
+        $word->setDefaultFontSize(12);
 
         // Header/Footer style
         $headerText = $org?->header_text ?? '';
@@ -63,6 +74,9 @@ class TenderExportService
             'marginLeft' => 1200, 'marginRight' => 1200,
         ]);
 
+        // Arabic-safe font settings for every text run
+        $arFont = ['name' => 'Traditional Arabic', 'rtl' => true, 'lang' => 'ar-SA'];
+
         // Word header
         $header = $section->addHeader();
         if ($org?->logo_path && file_exists(storage_path('app/public/' . $org->logo_path))) {
@@ -71,15 +85,15 @@ class TenderExportService
             ]);
         }
         if ($headerText) {
-            $header->addText($headerText, ['size' => 8, 'color' => '888888'], ['align' => 'center']);
+            $header->addText($headerText, [...$arFont, 'size' => 9, 'color' => '888888'], ['align' => 'center', 'bidi' => true]);
         }
 
         // Word footer
         $footer = $section->addFooter();
         if ($footerText) {
-            $footer->addText($footerText, ['size' => 8, 'color' => '888888'], ['align' => 'center']);
+            $footer->addText($footerText, [...$arFont, 'size' => 9, 'color' => '888888'], ['align' => 'center', 'bidi' => true]);
         }
-        $footer->addPreserveText('صفحة {PAGE} من {NUMPAGES}', ['size' => 8, 'color' => 'AAAAAA'], ['align' => 'center']);
+        $footer->addPreserveText('صفحة {PAGE} من {NUMPAGES}', [...$arFont, 'size' => 9, 'color' => 'AAAAAA'], ['align' => 'center', 'bidi' => true]);
 
         // Title page — logo
         if ($org?->logo_path && file_exists(storage_path('app/public/' . $org->logo_path))) {
@@ -90,31 +104,31 @@ class TenderExportService
         }
 
         $section->addText($tender->title, [
-            'name' => 'Arial', 'size' => 22, 'bold' => true, 'color' => $primaryColor,
-        ], ['align' => 'center', 'spaceAfter' => 400]);
+            ...$arFont, 'size' => 24, 'bold' => true, 'color' => $primaryColor,
+        ], ['align' => 'center', 'spaceAfter' => 400, 'bidi' => true]);
 
         $section->addText('كراسة الشروط والمواصفات', [
-            'size' => 16, 'color' => '666666',
-        ], ['align' => 'center', 'spaceAfter' => 200]);
+            ...$arFont, 'size' => 18, 'color' => '666666',
+        ], ['align' => 'center', 'spaceAfter' => 200, 'bidi' => true]);
 
         $section->addText($org?->name_ar ?? 'الجهة الحكومية', [
-            'size' => 14, 'bold' => true,
-        ], ['align' => 'center', 'spaceAfter' => 400]);
+            ...$arFont, 'size' => 16, 'bold' => true,
+        ], ['align' => 'center', 'spaceAfter' => 400, 'bidi' => true]);
 
         if ($org?->name_en) {
             $section->addText($org->name_en, [
-                'size' => 12, 'color' => '888888',
+                'name' => 'Calibri', 'size' => 13, 'color' => '888888',
             ], ['align' => 'center', 'spaceAfter' => 600]);
         }
 
         $section->addText('التاريخ: ' . now()->locale('ar')->isoFormat('D MMMM YYYY'), [
-            'size' => 12, 'color' => '888888',
-        ], ['align' => 'center']);
+            ...$arFont, 'size' => 13, 'color' => '888888',
+        ], ['align' => 'center', 'bidi' => true]);
 
         if ($org?->address || $org?->phone) {
             $section->addTextBreak(2);
             $contactLine = implode(' · ', array_filter([$org?->address, $org?->phone, $org?->email]));
-            $section->addText($contactLine, ['size' => 10, 'color' => 'AAAAAA'], ['align' => 'center']);
+            $section->addText($contactLine, [...$arFont, 'size' => 11, 'color' => 'AAAAAA'], ['align' => 'center', 'bidi' => true]);
         }
 
         $section->addPageBreak();
@@ -122,14 +136,14 @@ class TenderExportService
         // Sections
         foreach ($tender->sections as $tenderSection) {
             $section->addText($tenderSection->title, [
-                'name' => 'Arial', 'size' => 16, 'bold' => true, 'color' => $primaryColor,
-            ], ['align' => 'right', 'spaceAfter' => 200, 'spaceBefore' => 400,
+                ...$arFont, 'size' => 18, 'bold' => true, 'color' => $primaryColor,
+            ], ['align' => 'right', 'spaceAfter' => 200, 'spaceBefore' => 400, 'bidi' => true,
                 'borderBottomSize' => 6, 'borderBottomColor' => $accentColor]);
 
             foreach (explode("\n", $tenderSection->content ?? '') as $line) {
                 $line = trim($line);
                 if ($line === '') { $section->addTextBreak(1); continue; }
-                $section->addText($line, ['size' => 11], ['align' => 'right', 'spaceAfter' => 100]);
+                $section->addText($line, [...$arFont, 'size' => 12], ['align' => 'right', 'spaceAfter' => 100, 'bidi' => true]);
             }
         }
 
@@ -174,7 +188,12 @@ class TenderExportService
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <title>{$title}</title>
+    <!-- Use Google Fonts for reliable Arabic shaping in headless Chrome -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@400;600;700&family=Noto+Naskh+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         @page {
             size: A4;
@@ -183,19 +202,32 @@ class TenderExportService
                 content: "{$headerText}";
                 font-size: 8pt;
                 color: #888;
+                font-family: 'Cairo', 'Noto Naskh Arabic', 'Amiri', serif;
             }
             @bottom-center {
                 content: "{$footerText}";
                 font-size: 8pt;
                 color: #888;
+                font-family: 'Cairo', 'Noto Naskh Arabic', 'Amiri', serif;
             }
         }
+        * {
+            -webkit-font-feature-settings: "liga" on, "calt" on, "kern" on;
+            font-feature-settings: "liga" on, "calt" on, "kern" on;
+        }
         body {
-            font-family: 'Tajawal', 'Arial', sans-serif;
+            font-family: 'Cairo', 'Noto Naskh Arabic', 'Amiri', 'Segoe UI', 'Tahoma', 'Arial', sans-serif;
             font-size: 12pt;
-            line-height: 1.8;
+            line-height: 2;
             color: #1a1a1a;
             direction: rtl;
+            text-align: right;
+            unicode-bidi: embed;
+            word-wrap: break-word;
+        }
+        h1, h2, h3 {
+            font-family: 'Cairo', 'Noto Naskh Arabic', 'Amiri', serif;
+            font-weight: 700;
         }
         .header-bar {
             display: flex;

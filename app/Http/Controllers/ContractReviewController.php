@@ -71,10 +71,10 @@ class ContractReviewController extends Controller
 
         if ($document->content) {
             app(ElasticsearchService::class)->reindexDocument($document);
-            ReviewContractJob::dispatch($document);
+            ReviewContractJob::dispatchSync($document);
         }
 
         return redirect()->route('contract-reviews.show', $document)
-            ->with('success', 'تم رفع العقد للمراجعة. جاري التحليل في الخلفية.');
+            ->with('success', 'تم رفع العقد ومراجعته.');
     }
 }

@@ -359,7 +359,7 @@ class TextExtractorService
     private function extractXlsx(string $path): ?string
     {
         // Skip large Excel files that exhaust memory with PhpSpreadsheet
-        if (filesize($path) > 2 * 1024 * 1024) return null; // 2MB limit
+        if (filesize($path) > 500 * 1024) return null; // 500KB limit
 
         try {
             $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReaderForFile($path);

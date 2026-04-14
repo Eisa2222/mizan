@@ -67,10 +67,12 @@ class TenderReviewController extends Controller
 
         if ($document->content) {
             app(ElasticsearchService::class)->reindexDocument($document);
-            TenderReviewJob::dispatch($document);
-            // Run similarity comparison synchronously (queue worker not guaranteed)
+            // Dispatch AI review synchronously (queue worker not guaranteed on all environments)
+            // User sees "جاري المراجعة" while we process, then page refresh shows results
+            TenderReviewJob::dispatchSync($document);
+            // Run similarity comparison
             try {
-                app(\App\Services\TenderSimilarityService::class)->compareReview($document);
+                app(\App\Services\TenderSimilarityService::class)->compareReview($document->fresh());
             } catch (\Throwable) {}
         }
 

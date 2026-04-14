@@ -162,6 +162,96 @@ class TenderController extends Controller
             $tender->title . '.docx');
     }
 
+    // ─── Workflow Actions ───
+
+    /** Creator submits for approval */
+    public function submit(Request $request, Tender $tender): RedirectResponse
+    {
+        $this->ensureSameOrg($request, $tender);
+        abort_unless(in_array($tender->workflow_status, ['draft', 'rejected']), 422, 'لا يمكن إرسال هذه الكراسة.');
+
+        $tender->update([
+            'workflow_status' => 'submitted',
+            'submitted_by'   => $request->user()->id,
+            'submitted_at'   => now(),
+            'rejection_reason' => null,
+        ]);
+
+        // Notify OrgAdmin+ in the same org
+        $admins = \App\Models\User::where('org_id', $tender->org_id)
+            ->whereIn('role', ['SuperAdmin', 'OrgAdmin', 'LegalCounsel'])
+            ->where('id', '!=', $request->user()->id)
+            ->pluck('id');
+
+        foreach ($admins as $adminId) {
+            \App\Models\AppNotification::notify(
+                userId: $adminId,
+                type: 'tender_submitted',
+                title: 'كراسة مرسلة للاعتماد',
+                body: "الكراسة \"{$tender->title}\" مرسلة للاعتماد بواسطة {$request->user()->name}.",
+                data: ['tender_id' => $tender->id],
+            );
+        }
+
+        return back()->with('success', 'تم إرسال الكراسة للاعتماد.');
+    }
+
+    /** Approver approves */
+    public function approve(Request $request, Tender $tender): RedirectResponse
+    {
+        $this->ensureSameOrg($request, $tender);
+        abort_unless($request->user()->hasAtLeastRole(\App\Enums\UserRole::LegalCounsel), 403, 'ليس لديك صلاحية الاعتماد.');
+        abort_unless($tender->workflow_status === 'submitted', 422, 'الكراسة ليست في حالة انتظار الاعتماد.');
+
+        $tender->update([
+            'workflow_status' => 'approved',
+            'status'         => 'finalized',
+            'approved_by'    => $request->user()->id,
+            'approved_at'    => now(),
+        ]);
+
+        // Notify creator
+        if ($tender->created_by) {
+            \App\Models\AppNotification::notify(
+                userId: $tender->created_by,
+                type: 'tender_approved',
+                title: 'تم اعتماد الكراسة',
+                body: "الكراسة \"{$tender->title}\" تم اعتمادها بواسطة {$request->user()->name}.",
+                data: ['tender_id' => $tender->id],
+            );
+        }
+
+        return back()->with('success', 'تم اعتماد الكراسة.');
+    }
+
+    /** Approver rejects */
+    public function reject(Request $request, Tender $tender): RedirectResponse
+    {
+        $this->ensureSameOrg($request, $tender);
+        abort_unless($request->user()->hasAtLeastRole(\App\Enums\UserRole::LegalCounsel), 403, 'ليس لديك صلاحية الرفض.');
+        abort_unless($tender->workflow_status === 'submitted', 422, 'الكراسة ليست في حالة انتظار الاعتماد.');
+
+        $data = $request->validate(['rejection_reason' => 'required|string|min:5|max:1000']);
+
+        $tender->update([
+            'workflow_status'  => 'rejected',
+            'rejection_reason' => $data['rejection_reason'],
+        ]);
+
+        // Notify creator
+        if ($tender->created_by) {
+            \App\Models\AppNotification::notify(
+                userId: $tender->created_by,
+                type: 'tender_rejected',
+                title: 'تم رفض الكراسة',
+                body: "الكراسة \"{$tender->title}\" تم رفضها. السبب: {$data['rejection_reason']}",
+                data: ['tender_id' => $tender->id],
+            );
+        }
+
+        return back()->with('success', 'تم رفض الكراسة مع ذكر السبب.');
+    }
+
     public function destroy(Request $request, Tender $tender): RedirectResponse
     {
         $this->ensureSameOrg($request, $tender);

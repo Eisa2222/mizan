@@ -6,23 +6,76 @@
                 <div class="mz-page-sub">
                     ✨ كراسة مولّدة · {{ $tender->type_label }} · {{ $tender->status_label }}
                     @if ($tender->duration) · {{ $tender->duration }} @endif
+                    ·
+                    @php
+                        $wfColors = ['draft' => '#888', 'submitted' => '#e90', 'approved' => '#3dbf8a', 'rejected' => '#e55'];
+                        $wfIcons = ['draft' => '📝', 'submitted' => '⏳', 'approved' => '✅', 'rejected' => '❌'];
+                    @endphp
+                    <span style="color:{{ $wfColors[$tender->workflow_status] ?? '#888' }};font-weight:700">
+                        {{ $wfIcons[$tender->workflow_status] ?? '' }} {{ $tender->workflow_label }}
+                    </span>
                 </div>
             </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                {{-- Workflow actions --}}
+                @if (in_array($tender->workflow_status, ['draft', 'rejected']))
+                    <form method="POST" action="{{ route('tenders.submit', $tender) }}" style="display:inline">
+                        @csrf
+                        <button type="submit" class="mz-btn mz-btn-gold mz-btn-sm">📤 إرسال للاعتماد</button>
+                    </form>
+                @endif
+
+                @if ($tender->workflow_status === 'submitted' && auth()->user()->hasAtLeastRole(\App\Enums\UserRole::LegalCounsel))
+                    <form method="POST" action="{{ route('tenders.approve', $tender) }}" style="display:inline">
+                        @csrf
+                        <button type="submit" class="mz-btn mz-btn-sm" style="background:#3dbf8a;color:#fff">✅ اعتماد</button>
+                    </form>
+                    <form method="POST" action="{{ route('tenders.reject', $tender) }}" style="display:inline"
+                          x-data onsubmit="event.preventDefault(); let r = prompt('سبب الرفض:'); if(r && r.length >= 5) { let i = document.createElement('input'); i.type='hidden'; i.name='rejection_reason'; i.value=r; this.appendChild(i); this.submit(); } else if(r) { alert('السبب يجب أن يكون 5 أحرف على الأقل'); }">
+                        @csrf
+                        <button type="submit" class="mz-btn mz-btn-sm" style="background:#e55;color:#fff">❌ رفض</button>
+                    </form>
+                @endif
+
                 <form method="POST" action="{{ route('tenders.review', $tender) }}" style="display:inline">
                     @csrf
                     <button type="submit" class="mz-btn mz-btn-ghost mz-btn-sm">⚖ مراجعة الامتثال</button>
                 </form>
-                <form method="POST" action="{{ route('tenders.regenerate', $tender) }}" style="display:inline"
-                      onsubmit="return confirm('سيتم استبدال جميع الأقسام والبنود. هل أنت متأكد؟')">
-                    @csrf
-                    <button type="submit" class="mz-btn mz-btn-ghost mz-btn-sm">🔄 إعادة التوليد</button>
-                </form>
+                @if ($tender->workflow_status !== 'approved')
+                    <form method="POST" action="{{ route('tenders.regenerate', $tender) }}" style="display:inline"
+                          onsubmit="return confirm('سيتم استبدال جميع الأقسام والبنود. هل أنت متأكد؟')">
+                        @csrf
+                        <button type="submit" class="mz-btn mz-btn-ghost mz-btn-sm">🔄 إعادة التوليد</button>
+                    </form>
+                @endif
                 <a href="{{ route('tenders.export.pdf', $tender) }}" class="mz-btn mz-btn-ghost mz-btn-sm">📄 PDF</a>
                 <a href="{{ route('tenders.export.docx', $tender) }}" class="mz-btn mz-btn-ghost mz-btn-sm">📝 Word</a>
                 <a href="{{ route('tenders.index') }}" class="mz-btn mz-btn-ghost mz-btn-sm">← العودة</a>
             </div>
         </div>
+
+        {{-- Workflow status banners --}}
+        @if ($tender->workflow_status === 'rejected' && $tender->rejection_reason)
+            <div style="background:rgba(220,60,60,.12);border:1px solid rgba(220,60,60,.4);border-radius:8px;padding:12px 16px;margin-bottom:14px">
+                <div style="font-size:14px;font-weight:700;color:#e55;margin-bottom:4px">❌ تم رفض الكراسة</div>
+                <div style="font-size:13px;color:var(--cream)">السبب: {{ $tender->rejection_reason }}</div>
+                <div style="font-size:11px;color:var(--mute);margin-top:4px">يمكنك تعديل الكراسة وإعادة إرسالها للاعتماد.</div>
+            </div>
+        @elseif ($tender->workflow_status === 'submitted')
+            <div style="background:rgba(230,150,0,.1);border:1px solid rgba(230,150,0,.4);border-radius:8px;padding:12px 16px;margin-bottom:14px">
+                <div style="font-size:14px;font-weight:700;color:#e90">⏳ مرسلة للاعتماد</div>
+                <div style="font-size:12px;color:var(--dim)">
+                    بواسطة {{ $tender->submitter?->name ?? '—' }} · {{ $tender->submitted_at?->diffForHumans() }}
+                </div>
+            </div>
+        @elseif ($tender->workflow_status === 'approved')
+            <div style="background:rgba(61,191,138,.1);border:1px solid rgba(61,191,138,.4);border-radius:8px;padding:12px 16px;margin-bottom:14px">
+                <div style="font-size:14px;font-weight:700;color:#3dbf8a">✅ كراسة معتمدة</div>
+                <div style="font-size:12px;color:var(--dim)">
+                    اعتمدها {{ $tender->approver?->name ?? '—' }} · {{ $tender->approved_at?->diffForHumans() }}
+                </div>
+            </div>
+        @endif
 
         @if ($tender->review)
             @php

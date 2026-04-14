@@ -35,6 +35,12 @@
                             <span class="mz-badge {{ $tender->status === 'finalized' ? 'mz-badge-green' : ($tender->status === 'ready' ? 'mz-badge-gold' : 'mz-badge-grey') }}">
                                 {{ $tender->status_label }}
                             </span>
+                            @if ($tender->workflow_status && $tender->workflow_status !== 'draft')
+                                @php $wfBadge = ['submitted'=>'mz-badge-gold','approved'=>'mz-badge-green','rejected'=>'mz-badge-red']; @endphp
+                                <span class="mz-badge {{ $wfBadge[$tender->workflow_status] ?? 'mz-badge-grey' }}">
+                                    {{ $tender->workflow_label }}
+                                </span>
+                            @endif
                         </div>
                     </a>
                 @empty

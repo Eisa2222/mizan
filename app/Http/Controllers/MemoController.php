@@ -74,10 +74,10 @@ class MemoController extends Controller
 
         if ($document->content) {
             app(ElasticsearchService::class)->reindexDocument($document);
-            DraftMemoJob::dispatch($document);
+            DraftMemoJob::dispatchSync($document);
         }
 
         return redirect()->route('memos.show', $document)
-            ->with('success', 'تم رفع المسودة. جاري التحليل في الخلفية.');
+            ->with('success', 'تم رفع المسودة وتحليلها.');
     }
 }
