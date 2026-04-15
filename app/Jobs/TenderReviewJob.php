@@ -74,22 +74,40 @@ class TenderReviewJob implements ShouldQueue
 
         // Get findings — try up to 3 attempts with flexible parsing.
         // Ollama sometimes returns different JSON shapes (findings/suggestions/issues/etc).
+        // Use progressively shorter content on retries to avoid Ollama refusals on large docs.
+        $contentLengths = [6000, 4000, 2500];
         for ($attempt = 1; $attempt <= 3; $attempt++) {
+            $len = $contentLengths[$attempt - 1];
             try {
                 $raw = $claude->chat(
-                    messages: [['role' => 'user', 'content' => "راجع كراسة الشروط والمواصفات التالية والتزم بالهرم الأربعي للسند. ارجع JSON بهذا الشكل بالضبط: {\"findings\":[{\"issue_title\":\"...\",\"severity\":\"Critical|High|Medium|Improvement\",\"why_it_is_an_issue\":\"...\",\"recommendation\":\"...\"}]}\n\nالكراسة:\n" . mb_substr($content, 0, 8000)]],
+                    messages: [['role' => 'user', 'content' => "راجع كراسة الشروط والمواصفات التالية وأرجع ملاحظاتك **بالعربية الفصحى فقط** — ممنوع الإنجليزية. اكتب 5 ملاحظات على الأقل. JSON بالشكل: {\"findings\":[{\"issue_title\":\"عنوان عربي\",\"severity\":\"Critical|High|Medium|Improvement\",\"why_it_is_an_issue\":\"شرح عربي\",\"recommendation\":\"توصية عربية\"}]}\n\nالكراسة:\n" . mb_substr($content, 0, $len)]],
                     system: $findingsSystem,
-                    maxTokens: 4000,
+                    maxTokens: 3000,
                 );
                 $text = $raw['text'];
                 Log::info("TenderReviewJob findings raw", ['attempt' => $attempt, 'text_len' => mb_strlen($text), 'preview' => mb_substr($text, 0, 200)]);
 
                 $findings = $this->extractFindingsFromResponse($text);
-                if (!empty($findings)) break;
+
+                if (!empty($findings)) {
+                    // Check if response is in English — if so, retry with stronger instruction
+                    if ($this->isEnglishHeavy($findings) && $attempt < 3) {
+                        Log::info('TenderReviewJob: English detected, retrying with stronger Arabic enforcement');
+                        $findings = [];
+                        continue;
+                    }
+                    break;
+                }
             } catch (Throwable $e) {
                 $lastError = $e->getMessage();
                 Log::warning("TenderReviewJob findings attempt $attempt failed", ['error' => $lastError]);
             }
+        }
+
+        // Last resort: if findings are still English, translate them via AI
+        if (!empty($findings) && $this->isEnglishHeavy($findings)) {
+            Log::info('TenderReviewJob: translating English findings to Arabic');
+            $findings = $this->translateFindingsToArabic($findings, $claude);
         }
 
         // Get summary — also use chat() to avoid JSON mode issues
@@ -166,11 +184,24 @@ class TenderReviewJob implements ShouldQueue
         $medium      = collect($findings)->where('severity', 'متوسطة')->count();
         $improvement = collect($findings)->where('severity', 'تحسينية')->count();
 
+        // Compute compliance score deterministically from findings (more reliable
+        // than AI's arbitrary self-reported score). Severity weights match
+        // ComplianceService formula for consistency.
+        $computedScore = max(0, min(100,
+            100 - ($critical * 25) - ($high * 10) - ($medium * 4) - ($improvement * 1)
+        ));
+
+        // Use computed score unless AI provided one that aligns reasonably (within 10pts)
+        $aiScore = $summary['compliance_score'] ?? $summary['overall_score'] ?? null;
+        $finalScore = ($aiScore !== null && abs($aiScore - $computedScore) <= 10)
+            ? (int) $aiScore
+            : $computedScore;
+
         $document->analysis = [
-            'compliance_score'    => $summary['compliance_score'] ?? $summary['overall_score'] ?? 70,
+            'compliance_score'    => $finalScore,
             'executive_summary'   => $summary['summary'] ?? $summary['executive_summary'] ?? 'تم المراجعة.',
-            'ready_for_tender'    => $summary['ready_for_tender'] ?? ($critical === 0),
-            'needs_legal_review'  => $summary['needs_legal_review'] ?? ($critical > 0 || $high > 2),
+            'ready_for_tender'    => $critical === 0 && $high === 0 && $finalScore >= 80,
+            'needs_legal_review'  => $critical > 0 || $high > 2,
             'readiness_status'    => $summary['readiness_status'] ?? null,
             'final_recommendation' => $summary['final_recommendation'] ?? null,
             'findings'            => $findings,
@@ -194,6 +225,65 @@ class TenderReviewJob implements ShouldQueue
         );
     }
 
+    /** Detect if findings are mostly in English (ratio of latin letters to Arabic). */
+    private function isEnglishHeavy(array $findings): bool
+    {
+        $sample = '';
+        foreach (array_slice($findings, 0, 3) as $f) {
+            $sample .= ' ' . ($f['issue_title'] ?? $f['title'] ?? '') . ' ' . ($f['why_it_is_an_issue'] ?? $f['issue'] ?? '');
+        }
+        $latin  = preg_match_all('/[A-Za-z]/u', $sample);
+        $arabic = preg_match_all('/[\x{0621}-\x{064A}]/u', $sample);
+        if ($arabic === 0 && $latin > 5) return true;
+        // Latin-heavy: latin > 2x arabic
+        return $latin > ($arabic * 2) && $latin > 20;
+    }
+
+    /** Translate English findings to Arabic via AI (one compact call). */
+    private function translateFindingsToArabic(array $findings, \App\Services\ClaudeService $claude): array
+    {
+        try {
+            // Build a compact JSON of only the text fields to translate
+            $payload = [];
+            foreach ($findings as $i => $f) {
+                $payload[] = [
+                    'i'     => $i,
+                    'title' => $f['issue_title'] ?? $f['title'] ?? '',
+                    'issue' => $f['why_it_is_an_issue'] ?? $f['issue'] ?? '',
+                    'rec'   => $f['recommendation'] ?? '',
+                ];
+            }
+
+            $result = $claude->chatJson(
+                messages: [['role' => 'user', 'content' => json_encode($payload, JSON_UNESCAPED_UNICODE)]],
+                system: 'ترجم كل حقول title و issue و rec إلى العربية الفصحى. أرجع JSON بنفس البنية مع i و title و issue و rec بالعربية فقط. لا تغيّر i.',
+                maxTokens: 3000,
+            );
+
+            $translated = $result['data']['items'] ?? $result['data'] ?? [];
+            if (! is_array($translated)) return $findings;
+
+            foreach ($translated as $t) {
+                $i = $t['i'] ?? null;
+                if (!isset($findings[$i])) continue;
+                if (!empty($t['title'])) {
+                    $findings[$i]['issue_title'] = $t['title'];
+                    $findings[$i]['title']       = $t['title'];
+                }
+                if (!empty($t['issue'])) {
+                    $findings[$i]['why_it_is_an_issue'] = $t['issue'];
+                    $findings[$i]['issue']              = $t['issue'];
+                }
+                if (!empty($t['rec'])) {
+                    $findings[$i]['recommendation'] = $t['rec'];
+                }
+            }
+        } catch (Throwable $e) {
+            Log::warning('Translation fallback failed', ['error' => $e->getMessage()]);
+        }
+        return $findings;
+    }
+
     /**
      * Extract findings from AI response — handles multiple JSON shapes.
      * Accepts any of: findings/issues/suggestions/problems/observations/recommendations
@@ -211,7 +301,7 @@ class TenderReviewJob implements ShouldQueue
         if (! is_array($decoded)) return [];
 
         // Try common keys
-        $candidateKeys = ['findings', 'issues', 'suggestions', 'problems', 'observations', 'recommendations', 'notes', 'remarks'];
+        $candidateKeys = ['findings', 'issues', 'suggestions', 'problems', 'observations', 'recommendations', 'notes', 'remarks', 'result', 'results', 'items'];
         foreach ($candidateKeys as $key) {
             if (isset($decoded[$key]) && is_array($decoded[$key]) && !empty($decoded[$key])) {
                 return $this->normalizeFindings($decoded[$key]);
@@ -247,10 +337,10 @@ class TenderReviewJob implements ShouldQueue
     {
         return array_values(array_filter(array_map(function ($f) {
             if (! is_array($f)) return null;
-            $title = $f['issue_title'] ?? $f['title'] ?? $f['issue'] ?? $f['name'] ?? $f['problem'] ?? '';
-            $issue = $f['why_it_is_an_issue'] ?? $f['issue'] ?? $f['description'] ?? $f['problem'] ?? $f['reason'] ?? '';
+            $title = $f['issue_title'] ?? $f['title'] ?? $f['issue'] ?? $f['name'] ?? $f['problem'] ?? $f['query'] ?? $f['question'] ?? '';
+            $issue = $f['why_it_is_an_issue'] ?? $f['issue'] ?? $f['description'] ?? $f['problem'] ?? $f['reason'] ?? $f['answer'] ?? $f['explanation'] ?? '';
             $severity = $f['severity'] ?? $f['priority'] ?? $f['level'] ?? 'Medium';
-            $recommendation = $f['recommendation'] ?? $f['suggestion'] ?? $f['fix'] ?? $f['solution'] ?? '';
+            $recommendation = $f['recommendation'] ?? $f['suggestion'] ?? $f['fix'] ?? $f['solution'] ?? $f['action'] ?? '';
             if ($title === '' && $issue === '') return null;
             return [
                 'issue_title'        => $title,

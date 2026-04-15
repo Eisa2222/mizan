@@ -3,11 +3,11 @@
 namespace App\Services;
 
 use App\Models\Tender;
+use Mpdf\Mpdf;
 use PhpOffice\PhpWord\IOFactory;
 use PhpOffice\PhpWord\PhpWord;
 use PhpOffice\PhpWord\SimpleType\JcTable;
 use PhpOffice\PhpWord\Style\Language;
-use Spatie\Browsershot\Browsershot;
 use Throwable;
 
 /**
@@ -20,26 +20,60 @@ class TenderExportService
 {
     public function exportPdf(Tender $tender): string
     {
-        $html = $this->buildHtml($tender);
         $relPath = "tenders/{$tender->id}.pdf";
         $absPath = storage_path('app/public/' . $relPath);
         @mkdir(dirname($absPath), 0755, true);
 
+        // Ensure mPDF temp directories exist
+        $tempDir = storage_path('app/mpdf');
+        @mkdir($tempDir, 0755, true);
+        @mkdir($tempDir . '/ttfontdata', 0755, true);
+
         try {
-            Browsershot::html($html)
-                ->format('A4')
-                ->margins(20, 20, 25, 20)
-                ->showBackground()
-                ->noSandbox()
-                ->setOption('args', ['--lang=ar-SA', '--font-render-hinting=medium'])
-                ->waitUntilNetworkIdle()
-                // Extra wait to let Google Fonts Arabic load + shape correctly
-                ->setDelay(2000)
-                ->save($absPath);
+            $mpdf = new Mpdf([
+                'mode'              => 'utf-8',
+                'format'            => 'A4',
+                'orientation'       => 'P',
+                'default_font'      => 'dejavusans', // built-in font with Arabic glyphs
+                'default_font_size' => 12,
+                'tempDir'           => $tempDir,
+                'margin_left'       => 18,
+                'margin_right'      => 18,
+                'margin_top'        => 22,
+                'margin_bottom'     => 22,
+                'margin_header'     => 8,
+                'margin_footer'     => 8,
+                'autoScriptToLang'  => true,
+                'autoLangToFont'    => true,
+                'useSubstitutions'  => true,
+            ]);
+
+            // RTL direction for Arabic
+            $mpdf->SetDirectionality('rtl');
+            $mpdf->SetTitle($tender->title);
+            $mpdf->SetAuthor($tender->organization?->name_ar ?? 'ميزان');
+
+            // Header/Footer
+            $org = $tender->organization;
+            $headerText = $org?->header_text ?? '';
+            $footerText = $org?->footer_text ?? $this->buildFooterText($org);
+
+            if ($headerText) {
+                $mpdf->SetHTMLHeader('<div style="text-align:center;font-size:9pt;color:#888">' . e($headerText) . '</div>');
+            }
+            $mpdf->SetHTMLFooter('<div style="text-align:center;font-size:8pt;color:#999;border-top:1px solid #ddd;padding-top:4px">'
+                . ($footerText ? e($footerText) . ' · ' : '')
+                . 'صفحة {PAGENO} من {nbpg}'
+                . '</div>');
+
+            $html = $this->buildHtml($tender);
+            $mpdf->WriteHTML($html);
+            $mpdf->Output($absPath, \Mpdf\Output\Destination::FILE);
         } catch (Throwable $e) {
-            file_put_contents(storage_path('app/public/tenders/' . $tender->id . '.html'), $html);
+            // Fallback: save HTML for manual print
+            file_put_contents(storage_path('app/public/tenders/' . $tender->id . '.html'), $this->buildHtml($tender));
             throw new \RuntimeException('فشل توليد PDF: ' . $e->getMessage()
-                . '. ملف HTML متاح للتنزيل والطباعة من المتصفح.');
+                . '. ملف HTML متاح كخيار بديل.');
         }
 
         return $relPath;
@@ -183,133 +217,73 @@ class TenderExportService
                 . '</section>';
         }
 
+        // mPDF-optimized HTML — uses built-in DejaVu Sans (has Arabic glyphs)
         return <<<HTML
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="utf-8">
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <title>{$title}</title>
-    <!-- Use Google Fonts for reliable Arabic shaping in headless Chrome -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@400;600;700&family=Noto+Naskh+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        @page {
-            size: A4;
-            margin: 25mm 20mm 30mm 20mm;
-            @top-center {
-                content: "{$headerText}";
-                font-size: 8pt;
-                color: #888;
-                font-family: 'Cairo', 'Noto Naskh Arabic', 'Amiri', serif;
-            }
-            @bottom-center {
-                content: "{$footerText}";
-                font-size: 8pt;
-                color: #888;
-                font-family: 'Cairo', 'Noto Naskh Arabic', 'Amiri', serif;
-            }
-        }
-        * {
-            -webkit-font-feature-settings: "liga" on, "calt" on, "kern" on;
-            font-feature-settings: "liga" on, "calt" on, "kern" on;
-        }
         body {
-            font-family: 'Cairo', 'Noto Naskh Arabic', 'Amiri', 'Segoe UI', 'Tahoma', 'Arial', sans-serif;
-            font-size: 12pt;
-            line-height: 2;
+            font-family: dejavusans, sans-serif;
+            font-size: 11pt;
+            line-height: 1.9;
             color: #1a1a1a;
-            direction: rtl;
-            text-align: right;
-            unicode-bidi: embed;
-            word-wrap: break-word;
-        }
-        h1, h2, h3 {
-            font-family: 'Cairo', 'Noto Naskh Arabic', 'Amiri', serif;
-            font-weight: 700;
-        }
-        .header-bar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            border-bottom: 3px solid {$accentColor};
-            padding-bottom: 10px;
-            margin-bottom: 8mm;
-        }
-        .header-bar .logo-side {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        .header-bar .header-label {
-            font-size: 9pt;
-            color: #888;
-        }
-        .footer-bar {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            text-align: center;
-            font-size: 8pt;
-            color: #999;
-            border-top: 1px solid #ddd;
-            padding: 6px 20mm;
         }
         .cover {
             text-align: center;
-            padding: 50mm 0 30mm;
+            padding: 40mm 0 20mm;
             page-break-after: always;
         }
-        .cover .logo-cover {
-            margin-bottom: 15mm;
-        }
+        .cover .logo-cover { margin-bottom: 12mm; }
         .cover h1 {
-            font-size: 28pt;
+            font-size: 26pt;
             color: {$primaryColor};
-            margin: 0 0 12mm;
+            margin: 0 0 10mm;
+            font-weight: bold;
         }
         .cover .subtitle {
-            font-size: 16pt;
+            font-size: 15pt;
             color: #666;
-            margin-bottom: 8mm;
+            margin-bottom: 6mm;
         }
         .cover .org {
-            font-size: 15pt;
-            font-weight: 700;
-            margin-bottom: 4mm;
+            font-size: 14pt;
+            font-weight: bold;
+            margin-bottom: 3mm;
         }
         .cover .org-en {
-            font-size: 12pt;
-            color: #888;
-            margin-bottom: 20mm;
-        }
-        .cover .meta {
             font-size: 11pt;
             color: #888;
-            margin-bottom: 6mm;
+            margin-bottom: 15mm;
+        }
+        .cover .meta {
+            font-size: 10pt;
+            color: #888;
+            margin-bottom: 4mm;
         }
         .cover .contact {
             font-size: 9pt;
             color: #aaa;
-            margin-top: 15mm;
+            margin-top: 10mm;
         }
         .page-section {
             page-break-inside: avoid;
-            margin-bottom: 12mm;
+            margin-bottom: 8mm;
         }
         .page-section h2 {
-            font-size: 16pt;
+            font-size: 15pt;
             color: {$primaryColor};
             border-bottom: 2px solid {$accentColor};
-            padding-bottom: 4mm;
-            margin-bottom: 6mm;
+            padding-bottom: 3mm;
+            margin: 6mm 0 4mm;
+            font-weight: bold;
         }
         .page-section .content {
             font-size: 11pt;
             color: #333;
-            white-space: pre-wrap;
+            text-align: justify;
         }
     </style>
 </head>
@@ -324,7 +298,6 @@ class TenderExportService
         <div class="contact">{$contactLine}</div>
     </div>
     {$sectionsHtml}
-    <div class="footer-bar">{$footerText}</div>
 </body>
 </html>
 HTML;

@@ -44,6 +44,9 @@ class ContractReviewController extends Controller
 
     public function store(Request $request)
     {
+        // AI review takes 60-120s; override PHP timeout
+        @set_time_limit(300);
+        @ini_set('max_execution_time', '300');
 
         $data = $request->validate([
             'title' => 'required|string|max:255',

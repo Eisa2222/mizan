@@ -32,6 +32,10 @@ class TenderReviewController extends Controller
 
     public function store(Request $request)
     {
+        // AI review (Ollama) takes 60-120s; override PHP timeout to avoid killing the request
+        @set_time_limit(300);
+        @ini_set('max_execution_time', '300');
+
         $data = $request->validate([
             'title' => 'required|string|max:255',
             'tender_type' => 'nullable|string|max:100',
@@ -77,7 +81,7 @@ class TenderReviewController extends Controller
         }
 
         return redirect()->route('tender-reviews.show', $document)
-            ->with('success', 'تم رفع الكراسة. جاري المراجعة والفحص في الخلفية.');
+            ->with('success', 'تمت مراجعة الكراسة بنجاح.');
     }
 
     public function show(Request $request, LegalDocument $document)

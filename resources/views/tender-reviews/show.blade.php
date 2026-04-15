@@ -142,12 +142,11 @@
         @endif
 
         {{-- ═══ Tabs ═══ --}}
-        <div class="mz-card" x-data="{ tab: '{{ $hasAnalysis ? 'findings' : 'content' }}', filterSev: 'all', filterCat: 'all' }">
+        <div class="mz-card" x-data="{ tab: '{{ $hasAnalysis ? 'findings' : ($isPdfFile ? 'pdf' : 'ai') }}', filterSev: 'all', filterCat: 'all' }">
             <div class="mz-tabs">
                 @if ($hasAnalysis)
                     <button type="button" :class="tab==='findings' ? 'mz-tab active' : 'mz-tab'" @click="tab='findings'">📊 الملاحظات ({{ count($findings) }})</button>
                 @endif
-                <button type="button" :class="tab==='content' ? 'mz-tab active' : 'mz-tab'" @click="tab='content'">📄 نص الكراسة</button>
                 @if ($isPdfFile)
                     <button type="button" :class="tab==='pdf' ? 'mz-tab active' : 'mz-tab'" @click="tab='pdf'">📄 أصل الوثيقة</button>
                 @endif
@@ -241,14 +240,6 @@
             @endif
 
             {{-- Tab: Content --}}
-            <div class="mz-card-body mz-selectable" x-show="tab==='content'" x-cloak>
-                @if ($document->content)
-                    <div style="font-family:'Amiri',serif;font-size:15px;color:var(--cream);line-height:2.1;white-space:pre-wrap">{{ $document->content }}</div>
-                @else
-                    <p style="text-align:center;color:var(--mute);padding:32px">لا يوجد نص مستخرج.</p>
-                @endif
-            </div>
-
             {{-- Tab: PDF --}}
             @if ($isPdfFile)
                 <div class="mz-card-body" x-show="tab==='pdf'" x-cloak>

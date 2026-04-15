@@ -85,11 +85,189 @@ class TextExtractorService
         return $total;
     }
 
+    /**
+     * Extract via Tesseract OCR — converts PDF pages to images, then runs
+     * Arabic OCR. Slow but most accurate for Arabic PDFs where Poppler fails.
+     * Returns null if tools unavailable or OCR failed.
+     */
+    private function extractPdfViaOcr(string $path, int $maxPages = 20): ?string
+    {
+        // Find tesseract binary
+        $tesseract = $this->findBinary('tesseract', [
+            'C:\\Program Files\\Tesseract-OCR\\tesseract.exe',
+            '/usr/bin/tesseract',
+        ]);
+        if ($tesseract === null) return null;
+
+        // Find pdftoppm binary (from Poppler)
+        $pdftoppm = $this->findBinary('pdftoppm', [
+            'C:\\Users\\WinDows\\AppData\\Local\\Microsoft\\WinGet\\Packages\\oschwartz10612.Poppler_Microsoft.Winget.Source_8wekyb3d8bbwe\\poppler-25.07.0\\Library\\bin\\pdftoppm.exe',
+            '/mingw64/bin/pdftoppm',
+            '/usr/bin/pdftoppm',
+        ]);
+        if ($pdftoppm === null) return null;
+
+        $tessdata = storage_path('app/tessdata');
+        if (! is_dir($tessdata) || ! file_exists($tessdata . '/ara.traineddata')) {
+            // Fall back to system tessdata
+            $tessdata = null;
+        }
+
+        $tmpBase = sys_get_temp_dir() . '/ocr_' . uniqid();
+        @mkdir($tmpBase, 0755, true);
+        $pagesPrefix = $tmpBase . '/page';
+
+        // Convert PDF pages to PNG at 200 DPI (balance speed vs accuracy)
+        $cmd = escapeshellarg($pdftoppm) . ' -r 200 -l ' . $maxPages . ' '
+             . escapeshellarg($path) . ' ' . escapeshellarg($pagesPrefix) . ' -png 2>&1';
+        @shell_exec($cmd);
+
+        $pageImages = glob($pagesPrefix . '-*.png') ?: [];
+        if (empty($pageImages)) {
+            $this->cleanupOcrTemp($tmpBase);
+            return null;
+        }
+
+        $allText = '';
+        foreach ($pageImages as $img) {
+            $outBase = preg_replace('/\.png$/', '', $img);
+            $tessCmd = escapeshellarg($tesseract) . ' '
+                . escapeshellarg($img) . ' ' . escapeshellarg($outBase)
+                . ' -l ara+eng'
+                . ($tessdata ? ' --tessdata-dir ' . escapeshellarg($tessdata) : '')
+                . ' 2>&1';
+            @shell_exec($tessCmd);
+
+            $outFile = $outBase . '.txt';
+            if (is_readable($outFile)) {
+                $pageText = @file_get_contents($outFile) ?: '';
+                if (! mb_check_encoding($pageText, 'UTF-8')) {
+                    $pageText = mb_scrub($pageText, 'UTF-8');
+                }
+                $allText .= $pageText . "\n\n";
+            }
+        }
+
+        $this->cleanupOcrTemp($tmpBase);
+
+        if (trim($allText) === '') return null;
+        return $this->cleanup($allText);
+    }
+
+    private function findBinary(string $name, array $candidates): ?string
+    {
+        foreach ($candidates as $c) {
+            if (is_executable($c) || file_exists($c)) return $c;
+        }
+        $which = trim((string) @shell_exec(PHP_OS_FAMILY === 'Windows' ? "where {$name} 2>nul" : "which {$name} 2>/dev/null"));
+        if ($which !== '' && file_exists(explode("\n", $which)[0])) {
+            return trim(explode("\n", $which)[0]);
+        }
+        return null;
+    }
+
+    private function cleanupOcrTemp(string $dir): void
+    {
+        if (! is_dir($dir)) return;
+        foreach (glob($dir . '/*') ?: [] as $f) @unlink($f);
+        @rmdir($dir);
+    }
+
+    /**
+     * Extract text via Poppler's pdftotext. Poppler handles Arabic
+     * RTL + glyph joining correctly — far better than pure-PHP parsers.
+     * Returns null if Poppler unavailable or extraction failed.
+     */
+    private function extractPdfViaPoppler(string $path): ?string
+    {
+        // Find pdftotext binary (Linux, Laragon/MSYS, Windows Poppler)
+        $candidates = [
+            'pdftotext',
+            '/mingw64/bin/pdftotext',
+            '/usr/bin/pdftotext',
+            'C:\\laragon\\bin\\poppler\\pdftotext.exe',
+        ];
+
+        $binary = null;
+        foreach ($candidates as $c) {
+            if (is_executable($c)) { $binary = $c; break; }
+        }
+        if ($binary === null) {
+            // Try PATH lookup via `where`/`which`
+            $which = trim((string) @shell_exec(PHP_OS_FAMILY === 'Windows' ? 'where pdftotext 2>nul' : 'which pdftotext 2>/dev/null'));
+            if ($which !== '' && file_exists(explode("\n", $which)[0])) {
+                $binary = trim(explode("\n", $which)[0]);
+            }
+        }
+        if ($binary === null) return null;
+
+        $outFile = tempnam(sys_get_temp_dir(), 'pdftxt_');
+        $cmd = escapeshellarg($binary) . ' -layout -enc UTF-8 '
+             . escapeshellarg($path) . ' ' . escapeshellarg($outFile) . ' 2>&1';
+
+        @shell_exec($cmd);
+        if (! is_readable($outFile)) return null;
+
+        $text = @file_get_contents($outFile);
+        @unlink($outFile);
+        if ($text === false || $text === '') return null;
+
+        if (! mb_check_encoding($text, 'UTF-8')) {
+            $text = mb_scrub($text, 'UTF-8');
+        }
+
+        // Strip Unicode directional format chars that Poppler emits
+        // U+200E LRM, U+200F RLM, U+202A-E bidi overrides, U+2066-9 isolates
+        $text = preg_replace('/[\x{200E}\x{200F}\x{202A}-\x{202E}\x{2066}-\x{2069}]/u', '', $text) ?? $text;
+
+        // Narrow alef-displacement fix: ONLY apply when the fragment after
+        // the space+alef is very short (2-3 chars) AND ends at a word boundary.
+        // This catches broken "و ازرة"/"ك ارسة" while preserving real words
+        // like "الطاقة أن"/"تنفيذ أعمال"/"في إعداد" (4+ char words).
+        // (?!ل) at the alef rejects "ال" definite article so the regex doesn't
+        // consume "م ا لك" and miss the next "ك ا رسة" match.
+        $text = preg_replace_callback(
+            '/([\x{0621}-\x{064A}]) ([اأإآ])(?!ل)([\x{0621}-\x{064A}]{2,3})(?![\x{0621}-\x{064A}])/u',
+            function ($m) {
+                $first = mb_substr($m[3], 0, 1);
+                $rest  = mb_substr($m[3], 1);
+                return $m[1] . $first . $m[2] . $rest;
+            },
+            $text
+        ) ?? $text;
+
+        return $this->cleanup($text);
+    }
+
+    /** Public OCR extractor — use for Arabic PDFs where Poppler output is broken. */
+    public function extractPdfOcr(string $path, int $maxPages = 30): ?string
+    {
+        return $this->extractPdfViaOcr($path, $maxPages);
+    }
+
     private function extractPdf(string $path): ?string
     {
         // Skip very large PDFs that exhaust memory with smalot/pdfparser
         if (filesize($path) > 30 * 1024 * 1024) return null; // 30MB limit
 
+        // Preferred: Poppler's pdftotext — handles Arabic shaping + RTL correctly.
+        $popplerText = $this->extractPdfViaPoppler($path);
+        if ($popplerText !== null && $this->looksValid($popplerText)) {
+            return $popplerText;
+        }
+
+        // If Poppler returned almost nothing (< 100 chars) the PDF is likely
+        // scanned (image-based). Try OCR as a last resort — slower but works
+        // on scanned documents. For text PDFs, OCR produces worse output so
+        // we only use it when direct extraction fails.
+        if ($popplerText === null || mb_strlen(trim($popplerText)) < 100) {
+            $ocrText = $this->extractPdfViaOcr($path, 30);
+            if ($ocrText !== null && $this->looksValid($ocrText)) {
+                return $ocrText;
+            }
+        }
+
+        // Fallback: smalot/pdfparser (pure PHP, works offline but poorer Arabic).
         try {
             $parser = new PdfParser();
             $pdf = $parser->parseFile($path);
