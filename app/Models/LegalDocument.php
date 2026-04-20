@@ -103,11 +103,53 @@ class LegalDocument extends Model
 
     public function getTypeLabelAttribute(): string
     {
-        return self::TYPES[$this->type] ?? '—';
+        return self::typeLabel($this->type);
     }
 
     public function getKindLabelAttribute(): string
     {
-        return self::KINDS[$this->kind] ?? self::KINDS[self::KIND_DOCUMENT];
+        return self::kindLabel($this->kind);
+    }
+
+    /**
+     * Translate a document type ID. Falls back to the hard-coded Arabic
+     * label in self::TYPES so existing callers keep working. Use this
+     * helper (or trans('documents.types.X')) for new code so labels can
+     * be localised per user locale.
+     */
+    public static function typeLabel(?int $type): string
+    {
+        if ($type === null) {
+            return '—';
+        }
+
+        $translated = trans('documents.types.' . $type);
+        if (is_string($translated) && $translated !== 'documents.types.' . $type) {
+            return $translated;
+        }
+
+        return self::TYPES[$type] ?? '—';
+    }
+
+    public static function kindLabel(?string $kind): string
+    {
+        $kind ??= self::KIND_DOCUMENT;
+
+        $translated = trans("documents.kinds.$kind");
+        if (is_string($translated) && $translated !== "documents.kinds.$kind") {
+            return $translated;
+        }
+
+        return self::KINDS[$kind] ?? self::KINDS[self::KIND_DOCUMENT];
+    }
+
+    public static function relationTypeLabel(string $relation): string
+    {
+        $translated = trans("documents.relation_types.$relation");
+        if (is_string($translated) && $translated !== "documents.relation_types.$relation") {
+            return $translated;
+        }
+
+        return self::RELATION_TYPES[$relation] ?? $relation;
     }
 }

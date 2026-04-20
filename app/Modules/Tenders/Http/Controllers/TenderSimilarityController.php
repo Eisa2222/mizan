@@ -14,6 +14,9 @@ use Modules\Tenders\Actions\ReuseTenderSectionsAction;
 use Modules\Tenders\Http\Requests\CheckScopeRequest;
 use Modules\Tenders\Http\Requests\IgnoreSimilarityRequest;
 use Modules\Tenders\Http\Requests\ReuseTenderSectionsRequest;
+use Modules\Tenders\Http\Resources\TenderSimilarityResultResource;
+use Modules\Tenders\Http\Resources\TenderSimilarityScoreResource;
+use Modules\Tenders\Http\Resources\TenderSummaryResource;
 
 class TenderSimilarityController extends Controller
 {
@@ -30,7 +33,7 @@ class TenderSimilarityController extends Controller
         return response()->json([
             'tender_id' => $tender->id,
             'top_alert' => $this->buildTopAlert($results),
-            'matches'   => $results->map(fn ($result) => $this->formatResult($result))->values(),
+            'matches'   => TenderSimilarityResultResource::collection($results),
         ]);
     }
 
@@ -59,12 +62,12 @@ class TenderSimilarityController extends Controller
             ->pluck('matched_tender_id')
             ->toArray();
 
-        $filtered = $results->filter(fn ($result) => ! in_array($result->compared_tender_id, $ignored, true));
+        $filtered = $results->reject(fn ($result) => in_array($result->compared_tender_id, $ignored, true))->values();
 
         return response()->json([
             'tender_id'     => $tender->id,
             'top_alert'     => $this->buildTopAlert($filtered),
-            'matches'       => $filtered->map(fn ($result) => $this->formatResult($result))->values(),
+            'matches'       => TenderSimilarityResultResource::collection($filtered),
             'ignored_count' => count($ignored),
         ]);
     }
@@ -79,9 +82,9 @@ class TenderSimilarityController extends Controller
             ->first();
 
         return response()->json([
-            'source'     => $this->summarizeTender($tender),
-            'compared'   => $this->summarizeTender($matchedTender, withReview: true),
-            'similarity' => $result !== null ? $this->formatSimilarity($result) : null,
+            'source'     => (new TenderSummaryResource($tender))->toArray($request),
+            'compared'   => (new TenderSummaryResource($matchedTender))->additional(['with_review' => true])->toArray($request),
+            'similarity' => $result !== null ? (new TenderSimilarityScoreResource($result))->toArray($request) : null,
         ]);
     }
 
@@ -114,72 +117,6 @@ class TenderSimilarityController extends Controller
     private function ensureSameOrg(Request $request, Tender $tender): void
     {
         abort_if($tender->org_id !== $request->user()->org_id, 403);
-    }
-
-    private function summarizeTender(Tender $tender, bool $withReview = false): array
-    {
-        $payload = [
-            'id'       => $tender->id,
-            'title'    => $tender->title,
-            'type'     => $tender->type_label,
-            'scope'    => $tender->scope_input,
-            'sections' => $tender->sections->map(fn ($section) => [
-                'key'     => $section->section_key,
-                'title'   => $section->title,
-                'excerpt' => mb_substr($section->content, 0, 200),
-            ])->toArray(),
-        ];
-
-        if ($withReview) {
-            $payload['status']           = $tender->status_label;
-            $payload['compliance_score'] = $tender->review?->compliance_score;
-        }
-
-        return $payload;
-    }
-
-    private function formatSimilarity(TenderSimilarityResult $result): array
-    {
-        return [
-            'text_score'        => $result->text_similarity_score,
-            'semantic_score'    => $result->semantic_similarity_score,
-            'structural_score'  => $result->structural_similarity_score,
-            'final_score'       => $result->final_similarity_score,
-            'level'             => $result->similarity_level,
-            'level_label'       => $result->similarity_label,
-            'reusable_sections' => $result->reusable_sections,
-            'reusable_clauses'  => $result->reusable_clauses,
-            'lessons_learned'   => $result->lessons_learned,
-            'recommendation'    => $result->recommendation,
-        ];
-    }
-
-    private function formatResult(TenderSimilarityResult $result): array
-    {
-        $compared = $result->comparedTender;
-        $review   = $compared?->review;
-        $reusable = $result->reusable_sections ?? [];
-
-        return [
-            'tender_id'                   => $result->compared_tender_id,
-            'title'                       => $compared?->title ?? '—',
-            'type_label'                  => $compared?->type_label ?? '—',
-            'status'                      => $compared?->status ?? '—',
-            'status_label'                => $compared?->status_label ?? '—',
-            'compliance_score'            => $review?->compliance_score,
-            'text_similarity_score'       => $result->text_similarity_score,
-            'semantic_similarity_score'   => $result->semantic_similarity_score,
-            'structural_similarity_score' => $result->structural_similarity_score,
-            'final_similarity_score'      => $result->final_similarity_score,
-            'similarity_level'            => $result->similarity_level,
-            'similarity_label'            => $result->similarity_label,
-            'duplicate_risk'              => $result->duplicate_risk,
-            'matched_segments'            => $reusable['matched_segments'] ?? [],
-            'scope_coverage'              => $reusable['scope_coverage'] ?? null,
-            'reusable_sections'           => $reusable['sections'] ?? $reusable,
-            'lessons_learned'             => $result->lessons_learned,
-            'recommendation'              => $result->recommendation,
-        ];
     }
 
     private function buildTopAlert($results): ?array
