@@ -1,12 +1,3 @@
-@php
-    $unreadCount = auth()->check()
-        ? \App\Models\AppNotification::where('user_id', auth()->id())->whereNull('read_at')->count()
-        : 0;
-    $latestNotifs = auth()->check()
-        ? \App\Models\AppNotification::where('user_id', auth()->id())->latest()->take(5)->get()
-        : collect();
-@endphp
-
 <header class="mz-topbar">
     <div class="mz-tb-logo">
         <div class="mz-tb-mark">⚖️</div>
@@ -19,7 +10,7 @@
     <div class="mz-tb-search">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         <form method="GET" action="{{ route('search') }}" style="flex:1;display:flex">
-            <input name="q" placeholder="ابحث في المستندات القانونية..." value="{{ request('q') }}">
+            <input name="q" placeholder="ابحث في المستندات القانونية..." value="{{ is_string(request('q')) ? request('q') : '' }}">
         </form>
     </div>
 

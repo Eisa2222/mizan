@@ -1,3 +1,5 @@
+@section('title', 'مراجعة العقود')
+
 <x-app-layout>
     <div class="mz-screen">
         <div class="mz-page-head">
@@ -5,7 +7,9 @@
                 <div class="mz-page-title">📝 مراجعة العقود</div>
                 <div class="mz-page-sub">ارفع عقداً وسيقوم النظام بمراجعته وكشف المخاطر والمخالفات</div>
             </div>
-            <a href="{{ route('contract-reviews.create') }}" class="mz-btn mz-btn-gold">+ رفع عقد للمراجعة</a>
+            @can('contract_reviews.create')
+                <a href="{{ route('contract-reviews.create') }}" class="mz-btn mz-btn-gold">+ رفع عقد للمراجعة</a>
+            @endcan
         </div>
 
         <div class="mz-card">
@@ -45,8 +49,6 @@
             </div>
         </div>
 
-        @if ($docs->hasPages())
-            <div style="margin-top:16px">{{ $docs->links() }}</div>
-        @endif
+        <x-pagination :paginator="$docs" />
     </div>
 </x-app-layout>

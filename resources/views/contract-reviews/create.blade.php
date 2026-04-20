@@ -5,7 +5,7 @@
                 <div class="mz-page-title">📝 رفع عقد للمراجعة</div>
                 <div class="mz-page-sub">ارفع العقد وسيتم تحليله تلقائياً: كشف المخاطر، المخالفات، التعديلات المقترحة</div>
             </div>
-            <a href="{{ route('contract-reviews.index') }}" class="mz-btn mz-btn-ghost mz-btn-sm">← العودة</a>
+            <a href="{{ route('contract-reviews.index') }}" class="mz-btn mz-btn-ghost mz-btn-sm"><span class="mz-back-arrow">←</span> العودة</a>
         </div>
 
         <form method="POST" action="{{ route('contract-reviews.store') }}" enctype="multipart/form-data" class="mz-card" style="max-width:680px;padding:24px"

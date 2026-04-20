@@ -1,28 +1,29 @@
 <?php
 
-use App\Http\Controllers\AnnotationController;
-use App\Http\Controllers\Api\SearchController;
-use App\Http\Controllers\ArticleUpdateController;
-use App\Http\Controllers\AssistantController;
-use App\Http\Controllers\ContractReviewController;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\TenderReviewController;
-use App\Http\Controllers\DiscussionController;
-use App\Http\Controllers\DocumentController;
-use App\Http\Controllers\MemoController;
-use App\Http\Controllers\FolderController;
-use App\Http\Controllers\GpcKnowledgeController;
-use App\Http\Controllers\NotificationController;
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\RelationController;
-use App\Http\Controllers\SearchPageController;
-use App\Http\Controllers\TaskController;
-use App\Http\Controllers\AdminController;
-use App\Http\Controllers\Api\SimilarityController;
-use App\Http\Controllers\BrandingController;
-use App\Http\Controllers\TenderController;
-use App\Http\Controllers\VersionController;
-use App\Http\Controllers\WatchlistController;
+use Modules\Annotations\Http\Controllers\AnnotationController;
+use Modules\Search\Http\Controllers\SearchController;
+use Modules\ArticleUpdates\Http\Controllers\ArticleUpdateController;
+use Modules\Assistant\Http\Controllers\AssistantController;
+use Modules\ContractReviews\Http\Controllers\ContractReviewController;
+use Modules\Dashboard\Http\Controllers\DashboardController;
+use Modules\TenderReviews\Http\Controllers\TenderReviewController;
+use Modules\Discussions\Http\Controllers\DiscussionController;
+use Modules\Documents\Http\Controllers\DocumentController;
+use Modules\Memos\Http\Controllers\MemoController;
+use Modules\Folders\Http\Controllers\FolderController;
+use Modules\GpcKnowledge\Http\Controllers\GpcKnowledgeController;
+use Modules\Notifications\Http\Controllers\NotificationController;
+use Modules\Profile\Http\Controllers\ProfileController;
+use Modules\Relations\Http\Controllers\RelationController;
+use Modules\Search\Http\Controllers\SearchPageController;
+use Modules\Tasks\Http\Controllers\TaskController;
+use Modules\Admin\Http\Controllers\OrganizationController as AdminOrganizationController;
+use Modules\Admin\Http\Controllers\UserController as AdminUserController;
+use Modules\Tenders\Http\Controllers\TenderSimilarityController as SimilarityController;
+use Modules\Branding\Http\Controllers\BrandingController;
+use Modules\Tenders\Http\Controllers\TenderController;
+use Modules\Versions\Http\Controllers\VersionController;
+use Modules\Watchlist\Http\Controllers\WatchlistController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -55,13 +56,16 @@ Route::middleware('auth')->group(function () {
     Route::get('/memos/{document}', [MemoController::class, 'show'])->name('memos.show');
 
     // Admin Panel (SuperAdmin only)
-    Route::get('/admin/organizations', [AdminController::class, 'organizations'])->name('admin.organizations');
-    Route::get('/admin/organizations/create', [AdminController::class, 'createOrganization'])->name('admin.organizations.create');
-    Route::post('/admin/organizations', [AdminController::class, 'storeOrganization'])->name('admin.organizations.store');
-    Route::get('/admin/users', [AdminController::class, 'users'])->name('admin.users');
-    Route::get('/admin/users/create', [AdminController::class, 'createUser'])->name('admin.users.create');
-    Route::post('/admin/users', [AdminController::class, 'storeUser'])->name('admin.users.store');
-    Route::patch('/admin/users/{user}/role', [AdminController::class, 'updateUserRole'])->name('admin.users.update-role');
+    Route::middleware('super-admin')->prefix('admin')->name('admin.')->group(function () {
+        Route::get('/organizations', [AdminOrganizationController::class, 'index'])->name('organizations');
+        Route::get('/organizations/create', [AdminOrganizationController::class, 'create'])->name('organizations.create');
+        Route::post('/organizations', [AdminOrganizationController::class, 'store'])->name('organizations.store');
+
+        Route::get('/users', [AdminUserController::class, 'index'])->name('users');
+        Route::get('/users/create', [AdminUserController::class, 'create'])->name('users.create');
+        Route::post('/users', [AdminUserController::class, 'store'])->name('users.store');
+        Route::patch('/users/{user}/role', [AdminUserController::class, 'updateRole'])->name('users.update-role');
+    });
 
     // Organization Branding (هوية المؤسسة)
     Route::get('/branding', [BrandingController::class, 'edit'])->name('branding.edit');

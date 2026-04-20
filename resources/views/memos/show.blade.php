@@ -1,17 +1,10 @@
 <x-app-layout>
     @php
-        $annotations = \App\Models\Annotation::with('user')
-            ->where('document_id', $document->id)
-            ->visibleTo(auth()->user())
-            ->latest()->get();
-        $discussions = \App\Models\Discussion::with(['user', 'replies'])
-            ->where('document_id', $document->id)
-            ->visibleTo(auth()->user())
-            ->latest()->get();
-        $aiConfigured = app(\App\Services\ClaudeService::class)->isConfigured();
+        // $annotations, $discussions, $aiConfigured come from
+        // MemoController::show() via MemoShowContextQuery.
         $hasAnalysis = is_array($document->analysis) && !empty($document->analysis);
         $analysisStatus = $document->metadata['analysis_status'] ?? null;
-        $a = $document->analysis ?? [];
+        $analysis = $document->analysis ?? [];
         $isPdfFile = $document->file_path ? strtolower(pathinfo($document->file_path, PATHINFO_EXTENSION)) === 'pdf' : false;
     @endphp
 
@@ -21,7 +14,7 @@
                 <div class="mz-page-title">{{ $document->title }}</div>
                 <div class="mz-page-sub">📄 مسودة مذكرة · {{ $document->uploader?->name ?? '—' }} · {{ $document->created_at->diffForHumans() }}</div>
             </div>
-            <a href="{{ route('memos.index') }}" class="mz-btn mz-btn-ghost mz-btn-sm">← العودة للمذكرات</a>
+            <a href="{{ route('memos.index') }}" class="mz-btn mz-btn-ghost mz-btn-sm"><span class="mz-back-arrow">←</span> العودة للمذكرات</a>
         </div>
 
         <div style="display:flex;flex-direction:column;gap:16px;max-width:960px;margin:0 auto">
@@ -46,37 +39,68 @@
                         @elseif(!$hasAnalysis)
                             <div class="mz-notice mz-notice-warn"><div class="mz-notice-title">⏳ جاري التحليل</div><div class="mz-notice-body">حدّث الصفحة بعد دقيقة.</div></div>
                         @else
-                            @if(!empty($a['summary']))<div style="margin-bottom:18px"><div class="mz-section-label">الملخص</div><p style="font-size:14px;color:var(--cream);line-height:1.85">{{ $a['summary'] }}</p></div>@endif
+                            @if(!empty($analysis['summary']))<div style="margin-bottom:18px"><div class="mz-section-label">الملخص</div><p style="font-size:14px;color:var(--cream);line-height:1.85">{{ $analysis['summary'] }}</p></div>@endif
 
-                            @if(!empty($a['overall_assessment'])||!empty($a['persuasiveness_score']))
+                            @if(!empty($analysis['overall_assessment'])||!empty($analysis['persuasiveness_score']))
                                 <div style="margin-bottom:18px;padding:12px 16px;background:rgba(200,169,75,.06);border-right:4px solid var(--gold);border-radius:8px;display:flex;justify-content:space-between;align-items:center">
-                                    <span style="font-size:15px;font-weight:700;color:var(--gold)">التقييم: {{ $a['overall_assessment']??'—' }}</span>
-                                    @if(!empty($a['persuasiveness_score']))<span style="font-size:14px;color:var(--cream)">قوة الإقناع: <strong>{{ $a['persuasiveness_score'] }}</strong>/10</span>@endif
+                                    <span style="font-size:15px;font-weight:700;color:var(--gold)">التقييم: {{ $analysis['overall_assessment']??'—' }}</span>
+                                    @if(!empty($analysis['persuasiveness_score']))<span style="font-size:14px;color:var(--cream)">قوة الإقناع: <strong>{{ $analysis['persuasiveness_score'] }}</strong>/10</span>@endif
                                 </div>
                             @endif
 
-                            @if(!empty($a['legal_arguments']))
+                            @if(!empty($analysis['legal_arguments']))
                                 <div style="margin-bottom:18px"><div class="mz-section-label">الحجج القانونية</div>
-                                    @foreach($a['legal_arguments'] as $arg)
-                                        @php $str=$arg['strength']??'متوسطة'; $c=match($str){'قوية'=>'#3dbf8a','ضعيفة'=>'#e05555',default=>'#c8a94b'}; @endphp
-                                        <div style="background:var(--card2);border-right:3px solid {{ $c }};border-radius:8px;padding:10px 12px;margin-bottom:6px">
-                                            <div style="display:flex;justify-content:space-between"><span style="font-size:12px;color:var(--cream);font-weight:600">{{ $arg['argument']??'' }}</span><span style="font-size:10px;color:{{ $c }};font-weight:700">{{ $str }}</span></div>
-                                            @if(!empty($arg['note']))<div style="font-size:11px;color:var(--mute);margin-top:4px">{{ $arg['note'] }}</div>@endif
+                                    @foreach($analysis['legal_arguments'] as $arg)
+                                        @php
+                                            $strength = $arg['strength'] ?? 'متوسطة';
+                                            $strengthColor = match($strength){'قوية'=>'#3dbf8a','ضعيفة'=>'#e05555',default=>'#c8a94b'};
+                                        @endphp
+                                        <div style="background:var(--card2);border-right:3px solid {{ $strengthColor }};border-radius:8px;padding:10px 14px;margin-bottom:8px">
+                                            <div style="display:flex;justify-content:space-between;gap:12px">
+                                                <span style="font-size:12.5px;color:var(--cream);font-weight:600;flex:1">{{ $arg['argument'] ?? '' }}</span>
+                                                <span style="font-size:10px;color:{{ $strengthColor }};font-weight:700;flex-shrink:0">{{ $strength }}</span>
+                                            </div>
+                                            @if(!empty($arg['source_quote']))
+                                                <div class="mz-source-quote">
+                                                    <span class="mz-source-quote-label">نص المذكرة</span>
+                                                    {{ $arg['source_quote'] }}
+                                                </div>
+                                            @endif
+                                            @if(!empty($arg['note']))
+                                                <div style="font-size:11px;color:var(--mute);margin-top:6px">{{ $arg['note'] }}</div>
+                                            @endif
+                                            @if(!empty($arg['supporting_pattern']))
+                                                <div style="font-size:11px;color:var(--gold);margin-top:4px">⚖ {{ $arg['supporting_pattern'] }}</div>
+                                            @endif
                                         </div>
                                     @endforeach
                                 </div>
                             @endif
 
-                            @if(!empty($a['weak_points']))
+                            @if(!empty($analysis['weak_points']))
                                 <div style="margin-bottom:18px"><div class="mz-section-label" style="color:#e05555">نقاط الضعف</div>
-                                    @foreach($a['weak_points'] as $wp)
-                                        <div class="mz-risk-card mz-risk-med"><div style="font-size:12px;color:var(--cream);margin-bottom:4px">{{ $wp['point']??'' }}</div><div style="font-size:11px;color:var(--gold)">💡 {{ $wp['suggestion']??'' }}</div></div>
+                                    @foreach($analysis['weak_points'] as $weak)
+                                        <div class="mz-risk-card mz-risk-med">
+                                            <div style="font-size:12.5px;color:var(--cream);font-weight:600;margin-bottom:4px">{{ $weak['point'] ?? '' }}</div>
+                                            @if(!empty($weak['source_quote']))
+                                                <div class="mz-source-quote">
+                                                    <span class="mz-source-quote-label">نص المذكرة</span>
+                                                    {{ $weak['source_quote'] }}
+                                                </div>
+                                            @endif
+                                            @if(!empty($weak['suggestion']))
+                                                <div style="font-size:12px;color:var(--gold);margin-top:8px">💡 {{ $weak['suggestion'] }}</div>
+                                            @endif
+                                            @if(!empty($weak['reference_pattern']))
+                                                <div style="font-size:11px;color:var(--mute);margin-top:4px">⚖ {{ $weak['reference_pattern'] }}</div>
+                                            @endif
+                                        </div>
                                     @endforeach
                                 </div>
                             @endif
 
-                            @if(!empty($a['missing_references']))<div style="margin-bottom:18px"><div class="mz-section-label">مراجع مقترحة</div><ul style="padding-right:18px;color:var(--cream);font-size:13px;line-height:1.9">@foreach($a['missing_references'] as $mr)<li>📚 {{ $mr }}</li>@endforeach</ul></div>@endif
-                            @if(!empty($a['key_recommendations']))<div style="margin-bottom:18px"><div class="mz-section-label" style="color:#3dbf8a">التوصيات</div><ul style="padding-right:18px;color:var(--cream);font-size:13px;line-height:1.9">@foreach($a['key_recommendations'] as $kr)<li>✓ {{ $kr }}</li>@endforeach</ul></div>@endif
+                            @if(!empty($analysis['missing_references']))<div style="margin-bottom:18px"><div class="mz-section-label">مراجع مقترحة</div><ul style="padding-right:18px;color:var(--cream);font-size:13px;line-height:1.9">@foreach($analysis['missing_references'] as $mr)<li>📚 {{ $mr }}</li>@endforeach</ul></div>@endif
+                            @if(!empty($analysis['key_recommendations']))<div style="margin-bottom:18px"><div class="mz-section-label" style="color:#3dbf8a">التوصيات</div><ul style="padding-right:18px;color:var(--cream);font-size:13px;line-height:1.9">@foreach($analysis['key_recommendations'] as $kr)<li>✓ {{ $kr }}</li>@endforeach</ul></div>@endif
                         @endif
                     </div>
 

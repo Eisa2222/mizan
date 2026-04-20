@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\TenderStatus;
+use App\Enums\TenderWorkflowStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -125,5 +127,19 @@ class Tender extends Model
     public function getStatusLabelAttribute(): string
     {
         return self::STATUSES[$this->status] ?? '—';
+    }
+
+    /** Typed view of the string status column. */
+    public function statusEnum(): ?TenderStatus
+    {
+        return $this->status !== null ? TenderStatus::tryFrom((string) $this->status) : null;
+    }
+
+    /** Typed view of the string workflow_status column. */
+    public function workflowEnum(): ?TenderWorkflowStatus
+    {
+        return $this->workflow_status !== null
+            ? TenderWorkflowStatus::tryFrom((string) $this->workflow_status)
+            : null;
     }
 }

@@ -11,7 +11,7 @@
                 <div class="mz-page-title">{{ $task->title }}</div>
                 <div class="mz-page-sub">أنشأها {{ $task->creator?->name }} · {{ $task->created_at->diffForHumans() }}</div>
             </div>
-            <a href="{{ route('tasks.index') }}" class="mz-btn mz-btn-ghost mz-btn-sm">← العودة للكانبان</a>
+            <a href="{{ route('tasks.index') }}" class="mz-btn mz-btn-ghost mz-btn-sm"><span class="mz-back-arrow">←</span> العودة للكانبان</a>
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 320px;gap:16px">
@@ -117,17 +117,19 @@
                                         <div style="font-size:10px;color:var(--mute)">{{ \App\Models\TaskAssignment::ROLES[$a->role] ?? '' }}</div>
                                     </div>
                                 </div>
-                                <form method="POST" action="{{ route('tasks.unassign', [$task, $a->user_id]) }}">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" style="background:transparent;border:none;color:var(--red);cursor:pointer;font-size:14px">✕</button>
-                                </form>
+                                @can('update', $task)
+                                    <form method="POST" action="{{ route('tasks.unassign', [$task, $a->user_id]) }}">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" style="background:transparent;border:none;color:var(--red);cursor:pointer;font-size:14px">✕</button>
+                                    </form>
+                                @endcan
                             </div>
                         @empty
                             <p style="font-size:12px;color:var(--mute);text-align:center;padding:12px">لا يوجد مكلفون</p>
                         @endforelse
 
-                        @if ($availableUsers->count() > 0)
+                        @if ($availableUsers->count() > 0 && auth()->user()->can('update', $task))
                             <form method="POST" action="{{ route('tasks.assign', $task) }}" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--borderl)">
                                 @csrf
                                 <select name="user_id" required class="mz-inp" style="margin-bottom:8px">
@@ -147,33 +149,38 @@
                     </div>
                 </div>
 
-                {{-- Status quick change --}}
-                <div class="mz-card">
-                    <div class="mz-card-head">
-                        <div class="mz-card-title">تغيير الحالة</div>
-                    </div>
-                    <div class="mz-card-body" style="display:flex;flex-direction:column;gap:8px">
-                        @foreach ([1,2,3,4,5] as $st)
-                            @if ($st !== $task->status)
-                                <form method="POST" action="{{ route('tasks.status', $task) }}">
-                                    @csrf
-                                    @method('PATCH')
-                                    <input type="hidden" name="status" value="{{ $st }}">
-                                    <button type="submit" class="mz-btn mz-btn-ghost mz-btn-sm" style="width:100%;justify-content:flex-start">
-                                        → {{ $statuses[$st] }}
-                                    </button>
-                                </form>
-                            @endif
-                        @endforeach
+                @canany(['update', 'delete'], $task)
+                    <div class="mz-card">
+                        <div class="mz-card-head">
+                            <div class="mz-card-title">تغيير الحالة</div>
+                        </div>
+                        <div class="mz-card-body" style="display:flex;flex-direction:column;gap:8px">
+                            @can('update', $task)
+                                @foreach ([1,2,3,4,5] as $st)
+                                    @if ($st !== $task->status)
+                                        <form method="POST" action="{{ route('tasks.status', $task) }}">
+                                            @csrf
+                                            @method('PATCH')
+                                            <input type="hidden" name="status" value="{{ $st }}">
+                                            <button type="submit" class="mz-btn mz-btn-ghost mz-btn-sm" style="width:100%;justify-content:flex-start">
+                                                → {{ $statuses[$st] }}
+                                            </button>
+                                        </form>
+                                    @endif
+                                @endforeach
+                            @endcan
 
-                        <form method="POST" action="{{ route('tasks.destroy', $task) }}" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--borderl)"
-                              onsubmit="return confirm('هل أنت متأكد من حذف هذه المهمة؟')">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" style="background:transparent;border:none;color:var(--red);font-size:12px;cursor:pointer;font-family:inherit">🗑 حذف المهمة</button>
-                        </form>
+                            @can('delete', $task)
+                                <form method="POST" action="{{ route('tasks.destroy', $task) }}" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--borderl)"
+                                      onsubmit="return confirm('هل أنت متأكد من حذف هذه المهمة؟')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" style="background:transparent;border:none;color:var(--red);font-size:12px;cursor:pointer;font-family:inherit">🗑 حذف المهمة</button>
+                                </form>
+                            @endcan
+                        </div>
                     </div>
-                </div>
+                @endcanany
             </div>
         </div>
     </div>

@@ -6,6 +6,7 @@ use App\Models\AppNotification;
 use App\Models\LegalDocument;
 use App\Services\ClaudeService;
 use App\Services\TasbibatKnowledgeService;
+use App\Services\TrainingCorpusService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -30,7 +31,7 @@ class ReviewContractJob implements ShouldQueue
 
     public function __construct(public LegalDocument $document) {}
 
-    public function handle(ClaudeService $claude, TasbibatKnowledgeService $tasbibat): void
+    public function handle(ClaudeService $claude, TasbibatKnowledgeService $tasbibat, TrainingCorpusService $corpus): void
     {
         $document = $this->document->fresh();
         if (! $document) return;
@@ -51,8 +52,11 @@ class ReviewContractJob implements ShouldQueue
         // Retrieve tasbibat relevant to contract disputes for RAG context
         $tasbibatContext = $tasbibat->buildContextFor($content, courtType: 'تجاري', topK: 4);
 
+        // Reference corpus: Saudi regulation texts + contract templates
+        $corpusContext = $corpus->buildContextFor($content, kinds: ['document', 'contract'], topK: 3);
+
         $system = <<<SYSTEM
-أنت مراجع عقود قانوني سعودي متخصص. راجع العقد بعمق واستعن بالتسبيبات القضائية المرفقة لتحديد المخاطر القانونية بناءً على أحكام قضائية سابقة.
+أنت مراجع عقود قانوني سعودي متخصص. راجع العقد بعمق واستعن بالتسبيبات القضائية والمراجع المرفقة لتحديد المخاطر القانونية بناءً على الأنظمة والنماذج المعتمدة.
 
 المهام:
 1. لخّص العقد (3-5 جمل).
@@ -63,12 +67,20 @@ class ReviewContractJob implements ShouldQueue
 
 {$tasbibatContext}
 
-أرجع JSON فقط بالعربية بهذا الشكل:
-{"summary":"ملخص تفصيلي 3-5 جمل","risks":[{"severity":"high","description":"وصف تفصيلي للمخاطرة","clause":"نص البند المعني من العقد","mitigation":"الحل المقترح بالتفصيل","judicial_precedent":"إشارة لتسبيب قضائي مشابه إن وُجد"}],
-"recommended_amendments":[{"current":"النص الحالي كاملاً","suggested":"النص المقترح بعد التعديل كاملاً","reason":"سبب التعديل"}],
-"missing_protections":["وصف تفصيلي للبند الناقص"],"overall_rating":"جيد","overall_notes":"ملاحظات تفصيلية"}
+{$corpusContext}
 
-تعليمات: 1) اكتب تفاصيل كاملة في كل حقل 2) في recommended_amendments اكتب النص الأصلي من العقد في current والنص المعدّل في suggested 3) في risks.mitigation اكتب الحل كاملاً 4) JSON فقط بالعربية
+أرجع JSON فقط بالعربية بهذا الشكل:
+{"summary":"ملخص تفصيلي 3-5 جمل","risks":[{"severity":"high","description":"وصف تفصيلي للمخاطرة","clause":"نص البند المعني من العقد — اقتباس حرفي","source_quote":"اقتباس حرفي كامل من نص العقد يوضح موضع الخطر","mitigation":"الحل المقترح بالتفصيل","judicial_precedent":"إشارة لتسبيب قضائي مشابه إن وُجد"}],
+"compliance_issues":[{"law":"اسم النظام","article":"رقم المادة","issue":"وصف المخالفة","source_quote":"اقتباس حرفي من العقد للنص المخالف","recommendation":"التوصية"}],
+"recommended_amendments":[{"current":"النص الحالي كاملاً — اقتباس حرفي من العقد","suggested":"النص المقترح بعد التعديل كاملاً","reason":"سبب التعديل"}],
+"missing_protections":[{"issue":"وصف تفصيلي للبند الناقص","related_clause":"اقتباس من البند الحالي القريب الذي كان يفترض إضافة الحماية عنده (إن وُجد)"}],"overall_rating":"جيد","overall_notes":"ملاحظات تفصيلية"}
+
+تعليمات:
+1) اكتب تفاصيل كاملة في كل حقل
+2) في recommended_amendments اكتب النص الأصلي من العقد في current والنص المعدّل في suggested
+3) في risks.mitigation اكتب الحل كاملاً
+4) **source_quote حقل إلزامي** في كل risk و compliance_issue — يجب أن يكون اقتباساً حرفياً (verbatim) من نص العقد المرفق، ليطابق ما كتبه الأطراف بالضبط، حتى يتمكن المراجع من تحديد موضع الملاحظة
+5) JSON فقط بالعربية
 SYSTEM;
 
         try {

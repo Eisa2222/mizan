@@ -1,3 +1,5 @@
+@section('title', 'المذكرات')
+
 <x-app-layout>
     <div class="mz-screen">
         <div class="mz-page-head">
@@ -5,7 +7,9 @@
                 <div class="mz-page-title">📄 مسودات المذكرات</div>
                 <div class="mz-page-sub">ارفع مسودة مذكرة قانونية وسيقوم النظام بتحليلها وتقديم توصيات</div>
             </div>
-            <a href="{{ route('memos.create') }}" class="mz-btn mz-btn-gold">+ رفع مسودة</a>
+            @can('memos.create')
+                <a href="{{ route('memos.create') }}" class="mz-btn mz-btn-gold">+ رفع مسودة</a>
+            @endcan
         </div>
 
         <div class="mz-card">
@@ -46,8 +50,6 @@
             </div>
         </div>
 
-        @if ($docs->hasPages())
-            <div style="margin-top:16px">{{ $docs->links() }}</div>
-        @endif
+        <x-pagination :paginator="$docs" />
     </div>
 </x-app-layout>

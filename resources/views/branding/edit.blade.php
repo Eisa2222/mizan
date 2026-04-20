@@ -1,3 +1,5 @@
+@section('title', 'هوية المؤسسة')
+
 <x-app-layout>
     <div class="mz-screen">
         <div class="mz-page-head">

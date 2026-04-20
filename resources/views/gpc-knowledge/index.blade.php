@@ -1,3 +1,5 @@
+@section('title', 'قاعدة المعرفة')
+
 <x-app-layout>
     <div class="mz-screen">
         <div class="mz-page-head">
@@ -75,9 +77,7 @@
             @endforelse
         </div>
 
-        @if ($articles->hasPages())
-            <div style="margin-top:16px">{{ $articles->withQueryString()->links() }}</div>
-        @endif
+        <x-pagination :paginator="$articles" />
     </div>
 
     <style>

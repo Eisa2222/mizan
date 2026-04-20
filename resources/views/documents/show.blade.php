@@ -1,16 +1,7 @@
 <x-app-layout>
     @php
-        $isWatching = \App\Models\Watchlist::where('user_id', auth()->id())
-            ->where('document_id', $document->id)->exists();
-        $annotations = \App\Models\Annotation::with('user')
-            ->where('document_id', $document->id)
-            ->visibleTo(auth()->user())
-            ->latest()->get();
-        $discussions = \App\Models\Discussion::with(['user', 'replies'])
-            ->where('document_id', $document->id)
-            ->visibleTo(auth()->user())
-            ->latest()->get();
-
+        // $isWatching, $annotations, $discussions are injected by
+        // DocumentController::show() via DocumentShowContextQuery.
         // Already eager-loaded by DocumentController::show()
         $chunks = $document->chunks;
         $articleUpdates = $document->articleUpdates;
@@ -100,7 +91,7 @@
                         @if ($isWatching) ✓ تتابعه @else 👁 متابعة @endif
                     </button>
                 </form>
-                <a href="{{ route('documents.index') }}" class="mz-btn mz-btn-ghost mz-btn-sm">← العودة</a>
+                <a href="{{ route('documents.index') }}" class="mz-btn mz-btn-ghost mz-btn-sm"><span class="mz-back-arrow">←</span> العودة</a>
             </div>
         </div>
 

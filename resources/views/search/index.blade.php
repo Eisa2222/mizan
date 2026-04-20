@@ -1,4 +1,6 @@
 <x-app-layout>
+    @section('title', 'البحث القانوني')
+
     <div class="mz-screen">
         <div class="mz-page-head">
             <div>
@@ -150,10 +152,23 @@
                 return;
             }
 
-            // Results list — semantic engine adds ai_score and ai_reason fields
+            // Translate numeric ES score into a user-friendly relevance label.
+            // Raw _score values mean nothing to a legal user; bucket into
+            // "تطابق عالٍ / متوسط / ضعيف" instead.
+            const relevanceLabel = (s) => {
+                const v = Number(s ?? 0);
+                if (v >= 3)   return { text: 'تطابق عالٍ', cls: 'mz-sr-score-high' };
+                if (v >= 1)   return { text: 'تطابق متوسط', cls: 'mz-sr-score-med' };
+                if (v > 0)    return { text: 'تطابق ضعيف', cls: 'mz-sr-score-low' };
+                return null;
+            };
+
             const html = data.hits.map(hit => {
-                const aiScore = hit.ai_score != null ? `<span class="mz-sr-score">🤖 ${hit.ai_score}</span>` : '';
                 const reason = hit.ai_reason ? `<div class="mz-sr-reason">💡 ${escapeHtml(hit.ai_reason)}</div>` : '';
+                const rel = hit.ai_score != null
+                    ? { text: `توصية AI ${hit.ai_score}`, cls: 'mz-sr-score-high' }
+                    : relevanceLabel(hit.score);
+                const relBadge = rel ? `<span class="mz-sr-score ${rel.cls}">${rel.text}</span>` : '';
                 return `
                     <a href="/documents/${hit.document_id}" class="mz-search-result">
                         <div class="mz-sr-head">
@@ -168,7 +183,7 @@
                         <div class="mz-sr-meta">
                             <span>📄 المستند #${hit.document_id}</span>
                             <span>· جزء ${hit.chunk_index + 1}</span>
-                            ${aiScore || `<span class="mz-sr-score">${(hit.score || 0).toFixed(2)}</span>`}
+                            ${relBadge}
                         </div>
                     </a>
                 `;

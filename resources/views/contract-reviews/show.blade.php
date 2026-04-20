@@ -1,18 +1,33 @@
 <x-app-layout>
     @php
-        $annotations = \App\Models\Annotation::with('user')
-            ->where('document_id', $document->id)
-            ->visibleTo(auth()->user())
-            ->latest()->get();
-        $discussions = \App\Models\Discussion::with(['user', 'replies'])
-            ->where('document_id', $document->id)
-            ->visibleTo(auth()->user())
-            ->latest()->get();
-        $aiConfigured = app(\App\Services\ClaudeService::class)->isConfigured();
+        // $annotations, $discussions, $aiConfigured come from
+        // ContractReviewController::show() via ContractReviewShowContextQuery.
         $hasAnalysis = is_array($document->analysis) && !empty($document->analysis);
         $analysisStatus = $document->metadata['analysis_status'] ?? null;
-        $a = $document->analysis ?? [];
+        $analysis = $document->analysis ?? [];
         $isPdfFile = $document->file_path ? strtolower(pathinfo($document->file_path, PATHINFO_EXTENSION)) === 'pdf' : false;
+
+        // Severity statistics + unified findings list
+        $risks = $analysis['risks'] ?? [];
+        $compliance = $analysis['compliance_issues'] ?? [];
+        $amendments = $analysis['recommended_amendments'] ?? [];
+        $protections = $analysis['missing_protections'] ?? [];
+
+        $severityBuckets = ['critical' => 0, 'high' => 0, 'medium' => 0, 'low' => 0];
+        foreach ($risks as $risk) {
+            $sev = strtolower($risk['severity'] ?? 'medium');
+            $sev = in_array($sev, ['critical', 'high', 'medium', 'low'], true) ? $sev : 'medium';
+            $severityBuckets[$sev]++;
+        }
+        $severityBuckets['critical'] += count($compliance);
+        $totalFindings = array_sum($severityBuckets) + count($amendments) + count($protections);
+
+        $severityMeta = [
+            'critical' => ['label' => 'حرجة', 'icon' => '🔴', 'color' => '#e55'],
+            'high'     => ['label' => 'عالية', 'icon' => '🟠', 'color' => '#e78842'],
+            'medium'   => ['label' => 'متوسطة', 'icon' => '🟡', 'color' => '#c8a94b'],
+            'low'      => ['label' => 'تحسينية', 'icon' => '🟢', 'color' => '#3dbf8a'],
+        ];
     @endphp
 
     <div class="mz-screen">
@@ -21,7 +36,7 @@
                 <div class="mz-page-title">{{ $document->title }}</div>
                 <div class="mz-page-sub">📝 مراجعة عقد · {{ $document->uploader?->name ?? '—' }} · {{ $document->created_at->diffForHumans() }}</div>
             </div>
-            <a href="{{ route('contract-reviews.index') }}" class="mz-btn mz-btn-ghost mz-btn-sm">← العودة للعقود</a>
+            <a href="{{ route('contract-reviews.index') }}" class="mz-btn mz-btn-ghost mz-btn-sm"><span class="mz-back-arrow">←</span> العودة للعقود</a>
         </div>
 
         <div style="display:flex;flex-direction:column;gap:16px;max-width:960px;margin:0 auto">
@@ -29,9 +44,9 @@
             <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
 
                 {{-- Analysis result --}}
-                <div class="mz-card" x-data="{ tab: 'review' }">
+                <div class="mz-card" x-data="{ tab: 'review', filter: 'all' }">
                     <div class="mz-tabs">
-                        <button type="button" :class="tab==='review' ? 'mz-tab active' : 'mz-tab'" @click="tab='review'">📝 نتائج المراجعة</button>
+                        <button type="button" :class="tab==='review' ? 'mz-tab active' : 'mz-tab'" @click="tab='review'">📝 نتائج المراجعة @if($totalFindings > 0)<span class="mz-tab-count">{{ $totalFindings }}</span>@endif</button>
                         <button type="button" :class="tab==='content' ? 'mz-tab active' : 'mz-tab'" @click="tab='content'">📄 نص العقد</button>
                         @if ($isPdfFile)
                             <button type="button" :class="tab==='pdf' ? 'mz-tab active' : 'mz-tab'" @click="tab='pdf'">📄 أصل الوثيقة</button>
@@ -48,63 +63,186 @@
                         @elseif (!$hasAnalysis)
                             <div class="mz-notice mz-notice-warn"><div class="mz-notice-title">⏳ جاري المراجعة</div><div class="mz-notice-body">يجري النظام مراجعة العقد. حدّث الصفحة بعد دقيقة.</div></div>
                         @else
-                            @if(!empty($a['summary']))<div style="margin-bottom:18px"><div class="mz-section-label">الملخص</div><p style="font-size:14px;color:var(--cream);line-height:1.85">{{ $a['summary'] }}</p></div>@endif
-
-                            @if(!empty($a['overall_rating']))
-                                <div style="margin-bottom:18px;padding:12px 16px;background:rgba(200,169,75,.06);border-right:4px solid var(--gold);border-radius:8px">
-                                    <span style="font-size:15px;font-weight:700;color:var(--gold)">التقييم العام: {{ $a['overall_rating'] }}</span>
-                                    @if(!empty($a['overall_notes']))<div style="font-size:13px;color:var(--cream);margin-top:6px;line-height:1.7">{{ $a['overall_notes'] }}</div>@endif
+                            {{-- Executive summary: rating + severity stats --}}
+                            @if(!empty($analysis['summary']) || !empty($analysis['overall_rating']))
+                                <div class="mz-review-hero">
+                                    @if(!empty($analysis['overall_rating']))
+                                        <div class="mz-review-hero-rating">
+                                            <span class="mz-review-hero-label">التقييم العام</span>
+                                            <span class="mz-review-hero-value">{{ $analysis['overall_rating'] }}</span>
+                                        </div>
+                                    @endif
+                                    @if(!empty($analysis['summary']))
+                                        <p class="mz-review-hero-summary">{{ $analysis['summary'] }}</p>
+                                    @endif
+                                    @if(!empty($analysis['overall_notes']))
+                                        <p class="mz-review-hero-notes">{{ $analysis['overall_notes'] }}</p>
+                                    @endif
                                 </div>
                             @endif
 
-                            @if(!empty($a['risks']))
-                                <div style="margin-bottom:18px"><div class="mz-section-label" style="color:#e05555">المخاطر ({{ count($a['risks']) }})</div>
-                                    @foreach($a['risks'] as $r)
-                                        @php $sev=$r['severity']??'medium'; $sc=match($sev){'high','critical'=>'mz-risk-high','low'=>'mz-risk-low',default=>'mz-risk-med'}; $sl=match($sev){'high'=>'عالية','critical'=>'حرجة','low'=>'منخفضة',default=>'متوسطة'}; @endphp
-                                        <div class="mz-risk-card {{ $sc }}">
-                                            <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:12px;font-weight:700;color:var(--cream)">{{ $r['clause']??$r['description']??'' }}</span><span class="mz-risk-badge">{{ $sl }}</span></div>
-                                            @if(!empty($r['description'])&&!empty($r['clause']))<div style="font-size:12px;color:var(--dim);line-height:1.7;margin-bottom:4px">{{ $r['description'] }}</div>@endif
-                                            @if(!empty($r['mitigation']??$r['suggested_change']??''))<div style="font-size:11px;color:var(--gold)">💡 {{ $r['mitigation']??$r['suggested_change'] }}</div>@endif
-                                        </div>
+                            {{-- Severity stats bar --}}
+                            @if($totalFindings > 0)
+                                <div class="mz-sev-stats">
+                                    @foreach(['critical', 'high', 'medium', 'low'] as $sevKey)
+                                        @php $meta = $severityMeta[$sevKey]; $count = $severityBuckets[$sevKey]; @endphp
+                                        <button type="button"
+                                                @click="filter = filter === '{{ $sevKey }}' ? 'all' : '{{ $sevKey }}'"
+                                                :class="filter === '{{ $sevKey }}' ? 'mz-sev-stat active' : 'mz-sev-stat'"
+                                                style="--sev-color:{{ $meta['color'] }}"
+                                                @if($count === 0)disabled @endif>
+                                            <span class="mz-sev-stat-icon">{{ $meta['icon'] }}</span>
+                                            <span class="mz-sev-stat-count">{{ $count }}</span>
+                                            <span class="mz-sev-stat-label">{{ $meta['label'] }}</span>
+                                        </button>
+                                    @endforeach
+                                    <button type="button"
+                                            @click="filter = 'all'"
+                                            :class="filter === 'all' ? 'mz-sev-stat active' : 'mz-sev-stat'"
+                                            style="--sev-color:var(--gold)">
+                                        <span class="mz-sev-stat-count">{{ $totalFindings }}</span>
+                                        <span class="mz-sev-stat-label">الكل</span>
+                                    </button>
+                                </div>
+                            @endif
+
+                            {{-- Findings: risks + compliance (critical class) unified with anchor numbering --}}
+                            @if(!empty($risks) || !empty($compliance))
+                                <div class="mz-findings-section">
+                                    <div class="mz-section-label mz-findings-section-label">الملاحظات والمخاطر</div>
+
+                                    @php $findingIndex = 0; @endphp
+                                    @foreach($risks as $risk)
+                                        @php
+                                            $findingIndex++;
+                                            $sev = strtolower($risk['severity'] ?? 'medium');
+                                            $sev = in_array($sev, ['critical', 'high', 'medium', 'low'], true) ? $sev : 'medium';
+                                            $meta = $severityMeta[$sev];
+                                            $sourceQuote = $risk['source_quote'] ?? $risk['clause'] ?? null;
+                                        @endphp
+                                        <article class="mz-finding-card" id="finding-{{ $findingIndex }}"
+                                                 style="--sev-color:{{ $meta['color'] }}"
+                                                 x-show="filter === 'all' || filter === '{{ $sev }}'">
+                                            <header class="mz-finding-head">
+                                                <span class="mz-finding-num">#{{ $findingIndex }}</span>
+                                                <span class="mz-finding-sev">
+                                                    <span class="mz-finding-sev-dot"></span>
+                                                    {{ $meta['label'] }}
+                                                </span>
+                                                <h3 class="mz-finding-title">{{ $risk['description'] ?? '' }}</h3>
+                                            </header>
+                                            @if($sourceQuote)
+                                                <div class="mz-source-quote">
+                                                    <span class="mz-source-quote-label">نص العقد</span>
+                                                    {{ $sourceQuote }}
+                                                </div>
+                                            @endif
+                                            @if(!empty($risk['mitigation'] ?? $risk['suggested_change'] ?? ''))
+                                                <div class="mz-finding-action">
+                                                    <span class="mz-finding-action-label">💡 الحل المقترح</span>
+                                                    {{ $risk['mitigation'] ?? $risk['suggested_change'] }}
+                                                </div>
+                                            @endif
+                                            @if(!empty($risk['judicial_precedent']))
+                                                <div class="mz-finding-meta">⚖ {{ $risk['judicial_precedent'] }}</div>
+                                            @endif
+                                        </article>
+                                    @endforeach
+
+                                    @foreach($compliance as $issue)
+                                        @php
+                                            $findingIndex++;
+                                            $meta = $severityMeta['critical'];
+                                        @endphp
+                                        <article class="mz-finding-card" id="finding-{{ $findingIndex }}"
+                                                 style="--sev-color:{{ $meta['color'] }}"
+                                                 x-show="filter === 'all' || filter === 'critical'">
+                                            <header class="mz-finding-head">
+                                                <span class="mz-finding-num">#{{ $findingIndex }}</span>
+                                                <span class="mz-finding-sev">
+                                                    <span class="mz-finding-sev-dot"></span>
+                                                    مخالفة نظامية
+                                                </span>
+                                                <h3 class="mz-finding-title">
+                                                    {{ $issue['law'] ?? '' }}
+                                                    @if(!empty($issue['article'])) — المادة {{ $issue['article'] }}@endif
+                                                </h3>
+                                            </header>
+                                            @if(!empty($issue['issue']))
+                                                <p class="mz-finding-body">{{ $issue['issue'] }}</p>
+                                            @endif
+                                            @if(!empty($issue['source_quote']))
+                                                <div class="mz-source-quote">
+                                                    <span class="mz-source-quote-label">نص العقد</span>
+                                                    {{ $issue['source_quote'] }}
+                                                </div>
+                                            @endif
+                                            @if(!empty($issue['recommendation']))
+                                                <div class="mz-finding-action">
+                                                    <span class="mz-finding-action-label">💡 التوصية</span>
+                                                    {{ $issue['recommendation'] }}
+                                                </div>
+                                            @endif
+                                        </article>
                                     @endforeach
                                 </div>
                             @endif
 
-                            @if(!empty($a['compliance_issues']))
-                                <div style="margin-bottom:18px"><div class="mz-section-label" style="color:#e05555">مخالفات أنظمة ({{ count($a['compliance_issues']) }})</div>
-                                    @foreach($a['compliance_issues'] as $ci)
-                                        <div class="mz-risk-card mz-risk-high">
-                                            <div style="font-size:12px;font-weight:700;color:var(--cream);margin-bottom:4px">{{ $ci['law']??'' }} {{ !empty($ci['article'])?'— المادة '.$ci['article']:'' }}</div>
-                                            <div style="font-size:12px;color:var(--dim);line-height:1.7">{{ $ci['issue']??'' }}</div>
-                                            @if(!empty($ci['recommendation']))<div style="font-size:11px;color:var(--gold);margin-top:4px">💡 {{ $ci['recommendation'] }}</div>@endif
-                                        </div>
+                            @if(!empty($amendments))
+                                <div class="mz-findings-section">
+                                    <div class="mz-section-label mz-findings-section-label">✏ تعديلات مقترحة ({{ count($amendments) }})</div>
+                                    @foreach($amendments as $amendment)
+                                        <article class="mz-amendment-card">
+                                            @if(!empty($amendment['current']))
+                                                <div class="mz-source-quote mz-source-quote-strike">
+                                                    <span class="mz-source-quote-label">النص الحالي</span>
+                                                    {{ $amendment['current'] }}
+                                                </div>
+                                            @endif
+                                            @if(!empty($amendment['suggested']))
+                                                <div class="mz-suggested-quote">
+                                                    <span class="mz-suggested-quote-label">النص المقترح</span>
+                                                    {{ $amendment['suggested'] }}
+                                                </div>
+                                            @endif
+                                            @if(!empty($amendment['reason']))
+                                                <div class="mz-finding-meta">💡 {{ $amendment['reason'] }}</div>
+                                            @endif
+                                        </article>
                                     @endforeach
                                 </div>
                             @endif
 
-                            @if(!empty($a['recommended_amendments']))
-                                <div style="margin-bottom:18px"><div class="mz-section-label">تعديلات مقترحة ({{ count($a['recommended_amendments']) }})</div>
-                                    @foreach($a['recommended_amendments'] as $am)
-                                        <div style="background:var(--card2);border:1px solid var(--borderl);border-radius:8px;padding:10px 14px;margin-bottom:8px">
-                                            <div style="font-size:11px;color:var(--red);text-decoration:line-through;margin-bottom:4px">{{ $am['current']??'' }}</div>
-                                            <div style="font-size:12px;color:#3dbf8a;margin-bottom:4px">{{ $am['suggested']??'' }}</div>
-                                            <div style="font-size:11px;color:var(--mute)">💡 {{ $am['reason']??'' }}</div>
-                                        </div>
+                            @if(!empty($protections))
+                                <div class="mz-findings-section">
+                                    <div class="mz-section-label mz-findings-section-label">🛡 بنود حماية مفقودة ({{ count($protections) }})</div>
+                                    @foreach($protections as $protection)
+                                        <article class="mz-protection-card">
+                                            <div class="mz-protection-issue">⚠ {{ is_array($protection) ? ($protection['issue'] ?? '') : $protection }}</div>
+                                            @if(is_array($protection) && !empty($protection['related_clause']))
+                                                <div class="mz-source-quote">
+                                                    <span class="mz-source-quote-label">البند المرتبط من العقد</span>
+                                                    {{ $protection['related_clause'] }}
+                                                </div>
+                                            @endif
+                                        </article>
                                     @endforeach
                                 </div>
                             @endif
 
-                            @if(!empty($a['missing_protections']))
-                                <div style="margin-bottom:18px"><div class="mz-section-label">بنود حماية مفقودة</div>
-                                    <ul style="padding-right:18px;color:var(--cream);font-size:13px;line-height:1.9">@foreach($a['missing_protections'] as $mp)<li>⚠ {{ $mp }}</li>@endforeach</ul>
-                                </div>
-                            @endif
-
-                            @if(!empty($a['parties']))
-                                <div style="margin-bottom:18px"><div class="mz-section-label">الأطراف</div>
-                                    <ul style="padding-right:18px;color:var(--cream);font-size:13px;line-height:1.9">
-                                        @foreach($a['parties'] as $p)
-                                            <li>@if(is_array($p)){{ $p['name']??'' }} — {{ $p['role']??'' }}@else{{ $p }}@endif</li>
+                            @if(!empty($analysis['parties']))
+                                <div class="mz-findings-section">
+                                    <div class="mz-section-label mz-findings-section-label">👥 الأطراف</div>
+                                    <ul class="mz-parties-list">
+                                        @foreach($analysis['parties'] as $party)
+                                            <li>
+                                                @if(is_array($party))
+                                                    <strong>{{ $party['name'] ?? '' }}</strong>
+                                                    @if(!empty($party['role']))<span style="color:var(--mute)"> — {{ $party['role'] }}</span>@endif
+                                                @else
+                                                    {{ $party }}
+                                                @endif
+                                            </li>
                                         @endforeach
                                     </ul>
                                 </div>

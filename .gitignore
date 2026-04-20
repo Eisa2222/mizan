@@ -14,6 +14,7 @@
 /auth.json
 /node_modules
 /public/build
+!/public/build/.htaccess
 /public/hot
 /public/storage
 /storage/*.key
@@ -23,3 +24,23 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Local IDE and agent state — not part of the repo.
+/.claude/settings.local.json
+/.claude/scheduled_tasks.lock
+/.claude/launch.json
+/.claude/agents
+/.claude/worktrees
+
+# Runtime SQLite database (tests use a fresh one).
+/database/database.sqlite
+
+# Tesseract Arabic trained data is too large for git and not portable across
+# Tesseract versions — users download from tessdata_best during install.
+/storage/app/tessdata
+
+# Ad-hoc one-off migration/download scripts kept out of version control.
+/storage/app/extract_zip.php
+/storage/app/download_foNts.php
+/storage/app/download_fonts.php
+/storage/app/google-fonts.css
