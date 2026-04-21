@@ -45,11 +45,14 @@ class SystemSetting extends Model
      */
     public static function set(string $key, mixed $value, ?string $group = null, ?string $label = null): void
     {
+        // `group` is NOT NULL in the schema; default to 'misc' so
+        // callers that don't care about tab placement still insert
+        // cleanly.
         self::updateOrCreate(
             ['key' => $key],
             array_filter([
                 'value' => is_scalar($value) || $value === null ? $value : json_encode($value, JSON_UNESCAPED_UNICODE),
-                'group' => $group,
+                'group' => $group ?? 'misc',
                 'label' => $label,
             ], fn ($v) => $v !== null),
         );
