@@ -55,4 +55,15 @@ return [
         'version'  => env('ANTHROPIC_VERSION', '2023-06-01'),
     ],
 
+    // Moyasar payment gateway (Saudi). Actual values are written live by
+    // ApplySystemSettings middleware from the `system_settings` table —
+    // the env fallbacks exist only so CI can spin up without pre-seeding.
+    'moyasar' => [
+        'publishable_key' => env('MOYASAR_PUBLISHABLE_KEY'),
+        'secret_key'      => env('MOYASAR_SECRET_KEY'),
+        'webhook_secret'  => env('MOYASAR_WEBHOOK_SECRET'),
+        'test_mode'       => env('MOYASAR_TEST_MODE', true),
+        'base_url'        => 'https://api.moyasar.com/v1',
+    ],
+
 ];
