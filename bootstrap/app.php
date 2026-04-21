@@ -21,6 +21,12 @@ return Application::configure(basePath: dirname(__DIR__))
             'apply-system-settings' => \App\Http\Middleware\ApplySystemSettings::class,
         ]);
 
+        // Moyasar posts webhook events with their own signature scheme,
+        // not Laravel's CSRF token — exclude that path.
+        $middleware->validateCsrfTokens(except: [
+            'webhooks/moyasar',
+        ]);
+
         // Security headers + SaaS system settings on every central web
         // response. ApplySystemSettings pulls Moyasar keys, mail creds,
         // app_name from system_settings into Config before controllers run.
