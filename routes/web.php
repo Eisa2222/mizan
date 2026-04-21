@@ -24,7 +24,10 @@ use Modules\Branding\Http\Controllers\BrandingController;
 use Modules\Tenders\Http\Controllers\TenderController;
 use Modules\Versions\Http\Controllers\VersionController;
 use Modules\Watchlist\Http\Controllers\WatchlistController;
+use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\LandingController;
+use App\Http\Controllers\MoyasarWebhookController;
+use App\Http\Controllers\TenantPasswordSetupController;
 use Modules\SuperAdmin\Http\Controllers\Auth\AuthenticatedSessionController as SuperAdminSessionController;
 use Modules\SuperAdmin\Http\Controllers\CouponController;
 use Modules\SuperAdmin\Http\Controllers\DashboardController as SuperAdminDashboardController;
@@ -39,6 +42,20 @@ use Illuminate\Support\Facades\Route;
 
 // Public landing page — renders from DB (hero, features, plans, faqs).
 Route::get('/', LandingController::class)->name('landing');
+
+// Checkout flow (public, central). Moyasar webhook is CSRF-exempted
+// via bootstrap/app.php in the next block.
+Route::get('/checkout/{plan}',      [CheckoutController::class, 'show'])->name('checkout.show');
+Route::post('/checkout/apply-coupon', [CheckoutController::class, 'applyCoupon'])->name('checkout.apply-coupon');
+Route::get('/checkout/callback',    [CheckoutController::class, 'callback'])->name('checkout.callback');
+Route::get('/checkout/success',     [CheckoutController::class, 'success'])->name('checkout.success');
+
+// Moyasar webhook (server-to-server). CSRF is disabled for this path.
+Route::post('/webhooks/moyasar', MoyasarWebhookController::class)->name('webhooks.moyasar');
+
+// Tenant admin password setup lives on the tenant subdomain in
+// routes/tenant.php — kept out of central so the password write hits
+// the tenant DB, not the central connection.
 
 // Tenant / authenticated dashboard redirect — / is now landing, so send
 // app traffic through /app instead.

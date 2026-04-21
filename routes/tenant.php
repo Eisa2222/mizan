@@ -34,7 +34,15 @@ Route::middleware([
         return \Stancl\Tenancy\Features\UserImpersonation::makeResponse($token);
     })->name('impersonate');
 
+    // Tenant password setup — new admins land here from TenantWelcomeMail
+    // with a 48-hour signed URL. The password write hits the tenant DB,
+    // not central, because this route is inside the tenancy group.
+    Route::get('/password/setup/{token}', [\App\Http\Controllers\TenantPasswordSetupController::class, 'show'])
+        ->middleware('signed')
+        ->name('tenant.password.setup');
+    Route::post('/password/setup', [\App\Http\Controllers\TenantPasswordSetupController::class, 'store'])
+        ->name('tenant.password.setup.store');
+
     // Phase 4 will mount the real tenant app here (dashboard, documents,
-    // tasks, tenders, etc.) — moved from routes/web.php. For now nothing
-    // else lives on the tenant side so GET / stays central (landing).
+    // tasks, tenders, etc.) — moved from routes/web.php.
 });
