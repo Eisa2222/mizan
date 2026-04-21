@@ -24,9 +24,25 @@ use Modules\Branding\Http\Controllers\BrandingController;
 use Modules\Tenders\Http\Controllers\TenderController;
 use Modules\Versions\Http\Controllers\VersionController;
 use Modules\Watchlist\Http\Controllers\WatchlistController;
+use App\Http\Controllers\LandingController;
+use Modules\SuperAdmin\Http\Controllers\Auth\AuthenticatedSessionController as SuperAdminSessionController;
+use Modules\SuperAdmin\Http\Controllers\CouponController;
+use Modules\SuperAdmin\Http\Controllers\DashboardController as SuperAdminDashboardController;
+use Modules\SuperAdmin\Http\Controllers\LandingFaqController;
+use Modules\SuperAdmin\Http\Controllers\LandingFeatureController;
+use Modules\SuperAdmin\Http\Controllers\PaymentController as SuperAdminPaymentController;
+use Modules\SuperAdmin\Http\Controllers\PlanController;
+use Modules\SuperAdmin\Http\Controllers\SettingController;
+use Modules\SuperAdmin\Http\Controllers\SubscriptionController;
+use Modules\SuperAdmin\Http\Controllers\TenantController as SuperAdminTenantController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
+// Public landing page — renders from DB (hero, features, plans, faqs).
+Route::get('/', LandingController::class)->name('landing');
+
+// Tenant / authenticated dashboard redirect — / is now landing, so send
+// app traffic through /app instead.
+Route::get('/app', function () {
     return redirect(auth()->check() ? route('dashboard') : route('login'));
 });
 
@@ -175,3 +191,86 @@ Route::middleware('auth')->group(function () {
 });
 
 require __DIR__.'/auth.php';
+
+/*
+|--------------------------------------------------------------------------
+| SuperAdmin (SaaS Operators)
+|--------------------------------------------------------------------------
+| Separate guard, separate cookies, separate login. Nothing here ever
+| touches tenant data directly — reads cross-tenant from central tables
+| only (tenants, subscriptions, payments, coupons, plans).
+*/
+Route::prefix('super-admin')->name('super-admin.')->group(function () {
+
+    // Guest — login form
+    Route::middleware('guest:super_admin')->group(function () {
+        Route::get('/login',  [SuperAdminSessionController::class, 'create'])->name('login');
+        Route::post('/login', [SuperAdminSessionController::class, 'store'])->name('login.store');
+    });
+
+    // Authenticated SuperAdmin area
+    Route::middleware('super-admin.auth')->group(function () {
+        Route::post('/logout', [SuperAdminSessionController::class, 'destroy'])->name('logout');
+
+        Route::get('/', SuperAdminDashboardController::class)->name('dashboard');
+
+        // Tenants
+        Route::get('/tenants',                          [SuperAdminTenantController::class, 'index'])->name('tenants.index');
+        Route::get('/tenants/{tenant}',                 [SuperAdminTenantController::class, 'show'])->name('tenants.show');
+        Route::post('/tenants/{tenant}/suspend',        [SuperAdminTenantController::class, 'suspend'])->name('tenants.suspend');
+        Route::post('/tenants/{tenant}/activate',       [SuperAdminTenantController::class, 'activate'])->name('tenants.activate');
+        Route::delete('/tenants/{tenant}',              [SuperAdminTenantController::class, 'destroy'])->name('tenants.destroy');
+        Route::post('/tenants/{tenant}/change-plan',    [SuperAdminTenantController::class, 'changePlan'])->name('tenants.change-plan');
+        Route::post('/tenants/{tenant}/extend',         [SuperAdminTenantController::class, 'extend'])->name('tenants.extend');
+        Route::post('/tenants/{tenant}/impersonate/{userId}', [SuperAdminTenantController::class, 'impersonate'])->name('tenants.impersonate');
+
+        // Plans
+        Route::get('/plans',                   [PlanController::class, 'index'])->name('plans.index');
+        Route::get('/plans/create',            [PlanController::class, 'create'])->name('plans.create');
+        Route::post('/plans',                  [PlanController::class, 'store'])->name('plans.store');
+        Route::get('/plans/{plan}/edit',       [PlanController::class, 'edit'])->name('plans.edit');
+        Route::put('/plans/{plan}',            [PlanController::class, 'update'])->name('plans.update');
+        Route::post('/plans/{plan}/toggle',    [PlanController::class, 'toggle'])->name('plans.toggle');
+        Route::delete('/plans/{plan}',         [PlanController::class, 'destroy'])->name('plans.destroy');
+
+        // Subscriptions
+        Route::get('/subscriptions',                   [SubscriptionController::class, 'index'])->name('subscriptions.index');
+        Route::post('/subscriptions/{subscription}/cancel', [SubscriptionController::class, 'cancel'])->name('subscriptions.cancel');
+
+        // Payments
+        Route::get('/payments',                  [SuperAdminPaymentController::class, 'index'])->name('payments.index');
+        Route::post('/payments/{payment}/refund', [SuperAdminPaymentController::class, 'refund'])->name('payments.refund');
+
+        // Coupons
+        Route::get('/coupons',                  [CouponController::class, 'index'])->name('coupons.index');
+        Route::get('/coupons/create',           [CouponController::class, 'create'])->name('coupons.create');
+        Route::get('/coupons/generate',         [CouponController::class, 'generate'])->name('coupons.generate');
+        Route::post('/coupons',                 [CouponController::class, 'store'])->name('coupons.store');
+        Route::get('/coupons/{coupon}',         [CouponController::class, 'show'])->name('coupons.show');
+        Route::get('/coupons/{coupon}/edit',    [CouponController::class, 'edit'])->name('coupons.edit');
+        Route::put('/coupons/{coupon}',         [CouponController::class, 'update'])->name('coupons.update');
+        Route::post('/coupons/{coupon}/toggle', [CouponController::class, 'toggle'])->name('coupons.toggle');
+        Route::delete('/coupons/{coupon}',      [CouponController::class, 'destroy'])->name('coupons.destroy');
+
+        // Landing CMS
+        Route::prefix('landing')->name('landing.')->group(function () {
+            Route::get('/features',                        [LandingFeatureController::class, 'index'])->name('features.index');
+            Route::post('/features',                       [LandingFeatureController::class, 'store'])->name('features.store');
+            Route::put('/features/{feature}',              [LandingFeatureController::class, 'update'])->name('features.update');
+            Route::delete('/features/{feature}',           [LandingFeatureController::class, 'destroy'])->name('features.destroy');
+            Route::post('/features/reorder',               [LandingFeatureController::class, 'reorder'])->name('features.reorder');
+
+            Route::get('/faqs',                            [LandingFaqController::class, 'index'])->name('faqs.index');
+            Route::post('/faqs',                           [LandingFaqController::class, 'store'])->name('faqs.store');
+            Route::put('/faqs/{faq}',                      [LandingFaqController::class, 'update'])->name('faqs.update');
+            Route::delete('/faqs/{faq}',                   [LandingFaqController::class, 'destroy'])->name('faqs.destroy');
+            Route::post('/faqs/reorder',                   [LandingFaqController::class, 'reorder'])->name('faqs.reorder');
+        });
+
+        // Settings
+        Route::get('/settings',              [SettingController::class, 'index'])->name('settings.index');
+        Route::put('/settings',              [SettingController::class, 'update'])->name('settings.update');
+        Route::post('/settings/test-mail',   [SettingController::class, 'testMail'])->name('settings.test-mail');
+        Route::post('/settings/test-moyasar', [SettingController::class, 'testMoyasar'])->name('settings.test-moyasar');
+    });
+});

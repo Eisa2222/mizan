@@ -27,19 +27,14 @@ Route::middleware([
     PreventAccessFromCentralDomains::class,
 ])->group(function () {
 
-    // Phase 1 placeholder — real tenant app boots in Phase 4.
-    Route::get('/', function () {
-        return response()->json([
-            'tenant'   => tenant('id'),
-            'company'  => tenant('company_name'),
-            'message'  => 'Tenant context initialized. Phase 4 will mount the real app here.',
-        ]);
-    });
-
     // Impersonation redemption — SuperAdmin generates a token centrally,
     // user lands here on the tenant domain and gets logged in as the
     // target user. Token expires after 5 minutes.
     Route::get('/impersonate/{token}', function (string $token) {
         return \Stancl\Tenancy\Features\UserImpersonation::makeResponse($token);
     })->name('impersonate');
+
+    // Phase 4 will mount the real tenant app here (dashboard, documents,
+    // tasks, tenders, etc.) — moved from routes/web.php. For now nothing
+    // else lives on the tenant side so GET / stays central (landing).
 });

@@ -15,13 +15,18 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'role'        => \App\Http\Middleware\EnsureRole::class,
-            'super-admin' => \Modules\Admin\Http\Middleware\EnsureSuperAdmin::class,
+            'role'                  => \App\Http\Middleware\EnsureRole::class,
+            'super-admin'           => \Modules\Admin\Http\Middleware\EnsureSuperAdmin::class,
+            'super-admin.auth'      => \App\Http\Middleware\EnsureSuperAdminAuthenticated::class,
+            'apply-system-settings' => \App\Http\Middleware\ApplySystemSettings::class,
         ]);
 
-        // Security headers on every web response (OWASP + audit #2/#10).
+        // Security headers + SaaS system settings on every central web
+        // response. ApplySystemSettings pulls Moyasar keys, mail creds,
+        // app_name from system_settings into Config before controllers run.
         $middleware->web(append: [
             \App\Http\Middleware\SecurityHeaders::class,
+            \App\Http\Middleware\ApplySystemSettings::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
