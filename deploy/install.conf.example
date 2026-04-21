@@ -1,0 +1,111 @@
+# ──────────────────────────────────────────────────────────────
+# ملف إعدادات تثبيت منصة ميزان — Production
+# ──────────────────────────────────────────────────────────────
+# انسخ هذا الملف إلى install.conf ثم عدّل القيم حسب بيئتك:
+#   cp deploy/install.conf.example deploy/install.conf
+#
+# بعد تعبئة القيم، شغّل المثبّت:
+#   sudo bash deploy/install.sh
+#
+# الحقول المعلّمة بـ (إلزامي) يجب تعبئتها. الباقي له قيم افتراضية آمنة.
+# ──────────────────────────────────────────────────────────────
+
+# ─── الدومين والعنوان (إلزامي) ─────────────────────────────────
+# الدومين الرئيسي بدون https://
+DOMAIN=mizan.example.sa
+
+# URL كامل — سيُكتب في .env كـ APP_URL
+# للـ HTTPS: https://mizan.example.sa
+# للتطوير المحلي: http://localhost
+APP_URL=https://mizan.example.sa
+
+# البريد الإلكتروني لتنبيهات Let's Encrypt والمدير
+ADMIN_EMAIL=admin@example.sa
+
+# ─── بيئة التشغيل ──────────────────────────────────────────────
+# production | staging | local
+APP_ENV=production
+
+# اسم التطبيق (يظهر في المتصفح + الإشعارات)
+APP_NAME=ميزان
+
+# timezone — عادة Asia/Riyadh للسعودية
+APP_TIMEZONE=Asia/Riyadh
+
+# ─── قاعدة البيانات (إلزامي) ───────────────────────────────────
+# mysql | pgsql | sqlite
+DB_CONNECTION=mysql
+
+# تجاهل الباقي إذا اخترت sqlite (ستُنشأ تلقائياً)
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=mizaan
+DB_USERNAME=mizaan_user
+# استخدم كلمة مرور قوية — لا تستخدم قيمة placeholder في الإنتاج
+DB_PASSWORD=CHANGE_ME_TO_STRONG_PASSWORD
+
+# ─── محرك AI (إلزامي — اختر واحداً) ────────────────────────────
+# ollama | anthropic
+AI_PROVIDER=ollama
+
+# إذا AI_PROVIDER=ollama:
+OLLAMA_HOST=http://localhost:11434
+OLLAMA_MODEL=gemma3:27b
+
+# إذا AI_PROVIDER=anthropic:
+# اترك فارغاً إذا تستخدم ollama
+ANTHROPIC_API_KEY=
+ANTHROPIC_MODEL=claude-sonnet-4-5
+
+# ─── محرك البحث (اختياري — RAG) ────────────────────────────────
+# Elasticsearch يُحسّن جودة البحث الدلالي. إذا غير متاح، النظام يستخدم
+# SQL LIKE (أبطأ وأقل دقة لكنه يعمل).
+ELASTICSEARCH_HOST=http://localhost:9200
+
+# ─── Queue (اختياري — للمعالجة في الخلفية) ─────────────────────
+# sync (افتراضي، يعمل مباشرة) | database | redis
+QUEUE_CONNECTION=database
+
+# إذا اخترت redis:
+# REDIS_HOST=127.0.0.1
+# REDIS_PORT=6379
+
+# ─── البريد (اختياري — لإرسال تحقق البريد والتنبيهات) ──────────
+MAIL_MAILER=log
+# للـ SMTP حقيقي:
+# MAIL_MAILER=smtp
+# MAIL_HOST=smtp.example.sa
+# MAIL_PORT=587
+# MAIL_USERNAME=
+# MAIL_PASSWORD=
+# MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS=no-reply@mizan.example.sa
+MAIL_FROM_NAME="منصة ميزان"
+
+# ─── SSL / HTTPS (اختياري) ─────────────────────────────────────
+# letsencrypt | custom | none
+# letsencrypt: يستخدم certbot تلقائياً
+# custom: يتوقع المفاتيح في /etc/ssl/certs/ و /etc/ssl/private/
+# none: HTTP فقط (غير موصى به للإنتاج)
+SSL_MODE=letsencrypt
+
+# ─── خادم الويب ──────────────────────────────────────────────
+# nginx | apache
+WEB_SERVER=nginx
+
+# PHP-FPM socket path (عادة تلقائي)
+PHP_FPM_SOCK=/run/php/php8.3-fpm.sock
+
+# ─── المستخدم الإداري الأول (إلزامي) ─────────────────────────
+INITIAL_ADMIN_EMAIL=admin@mizan.local
+# استخدم كلمة مرور قوية — المثبّت سيُخزّنها مشفّرة
+INITIAL_ADMIN_PASSWORD=ChangeMe@Admin2026
+INITIAL_ADMIN_NAME="مدير النظام"
+
+# ─── OCR (اختياري — للـ PDF المصوّرة العربية) ───────────────────
+# true | false — إذا true، المثبّت ينزّل حزمة العربية لـ Tesseract (~13MB)
+INSTALL_ARABIC_OCR=true
+
+# ─── خيارات متقدّمة ─────────────────────────────────────────
+# مسار التثبيت (القراءة فقط — يُحدَّد تلقائياً)
+# INSTALL_PATH=/var/www/mizan

@@ -1,3 +1,5 @@
+@section('title', 'مراجعة الكراسات')
+
 <x-app-layout>
     <div class="mz-screen">
         <div class="mz-page-head">
@@ -5,7 +7,9 @@
                 <div class="mz-page-title">📋 مراجعة الكراسات</div>
                 <div class="mz-page-sub">فحص كراسات الشروط والمواصفات للتحقق من مطابقتها لنظام المنافسات والمشتريات الحكومية</div>
             </div>
-            <a href="{{ route('tender-reviews.create') }}" class="mz-btn mz-btn-gold">+ رفع كراسة للمراجعة</a>
+            @can('tender_reviews.create')
+                <a href="{{ route('tender-reviews.create') }}" class="mz-btn mz-btn-gold">+ رفع كراسة للمراجعة</a>
+            @endcan
         </div>
 
         <div class="mz-card">
@@ -62,8 +66,6 @@
             </div>
         </div>
 
-        @if ($docs->hasPages())
-            <div style="margin-top:16px">{{ $docs->links() }}</div>
-        @endif
+        <x-pagination :paginator="$docs" />
     </div>
 </x-app-layout>

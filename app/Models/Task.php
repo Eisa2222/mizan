@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\TaskPriority;
+use App\Enums\TaskStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -16,6 +18,18 @@ class Task extends Model
     protected $casts = [
         'due_date' => 'date',
     ];
+
+    /** Typed view of the integer status column. Views that still work with the raw int remain unaffected. */
+    public function statusEnum(): ?TaskStatus
+    {
+        return $this->status !== null ? TaskStatus::tryFrom((int) $this->status) : null;
+    }
+
+    /** Typed view of the integer priority column. */
+    public function priorityEnum(): ?TaskPriority
+    {
+        return $this->priority !== null ? TaskPriority::tryFrom((int) $this->priority) : null;
+    }
 
     public const STATUSES = [
         1 => 'جديدة',

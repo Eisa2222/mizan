@@ -1,3 +1,5 @@
+@section('title', 'المتابعة')
+
 <x-app-layout>
     <div class="mz-screen">
         <div class="mz-page-head">
@@ -25,16 +27,14 @@
                     </div>
                 @endif
             @empty
-                <div class="mz-card" style="padding:48px;text-align:center;color:var(--mute)">
-                    <div style="font-size:48px;margin-bottom:12px">👁</div>
-                    <div style="font-size:14px">لا تتابع أي مستند بعد</div>
-                    <a href="{{ route('documents.index') }}" class="mz-btn mz-btn-gold mz-btn-sm" style="margin-top:12px">تصفّح المستندات</a>
-                </div>
+                <x-empty-state
+                    icon="👁"
+                    title="لا تتابع أي مستند بعد"
+                    :action="route('documents.index')"
+                    actionLabel="تصفّح المستندات" />
             @endforelse
         </div>
 
-        @if ($items->hasPages())
-            <div>{{ $items->links() }}</div>
-        @endif
+        <x-pagination :paginator="$items" />
     </div>
 </x-app-layout>

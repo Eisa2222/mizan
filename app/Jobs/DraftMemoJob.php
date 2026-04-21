@@ -6,6 +6,7 @@ use App\Models\AppNotification;
 use App\Models\LegalDocument;
 use App\Services\ClaudeService;
 use App\Services\TasbibatKnowledgeService;
+use App\Services\TrainingCorpusService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -30,7 +31,7 @@ class DraftMemoJob implements ShouldQueue
 
     public function __construct(public LegalDocument $document) {}
 
-    public function handle(ClaudeService $claude, TasbibatKnowledgeService $tasbibat): void
+    public function handle(ClaudeService $claude, TasbibatKnowledgeService $tasbibat, TrainingCorpusService $corpus): void
     {
         $document = $this->document->fresh();
         if (! $document) return;
@@ -51,6 +52,9 @@ class DraftMemoJob implements ShouldQueue
         // Retrieve relevant judicial reasoning patterns for RAG context
         $tasbibatContext = $tasbibat->buildContextFor($content, topK: 5);
 
+        // Reference corpus: memo templates + system regulations
+        $corpusContext = $corpus->buildContextFor($content, kinds: ['memo', 'document', 'case'], topK: 3);
+
         $system = <<<SYSTEM
 أنت خبير مراجعة مذكرات قانونية سعودي. حلّل المذكرة بعناية واستفد من التسبيبات القضائية المرفقة لتقوية تقييمك.
 
@@ -64,13 +68,17 @@ class DraftMemoJob implements ShouldQueue
 
 {$tasbibatContext}
 
+{$corpusContext}
+
 أرجع JSON فقط بالشكل التالي (بالعربية فقط):
 {"summary":"ملخص","memo_type":"نوع المذكرة",
-"legal_arguments":[{"argument":"الحجة","strength":"قوية أو متوسطة أو ضعيفة","note":"ملاحظة","supporting_pattern":"نمط تسبيب داعم إن وُجد"}],
-"weak_points":[{"point":"نقطة ضعف","suggestion":"اقتراح","reference_pattern":"نمط تسبيب مقترح إن وُجد"}],
+"legal_arguments":[{"argument":"الحجة","source_quote":"اقتباس حرفي من المذكرة يمثل الحجة","strength":"قوية أو متوسطة أو ضعيفة","note":"ملاحظة","supporting_pattern":"نمط تسبيب داعم إن وُجد"}],
+"weak_points":[{"point":"نقطة ضعف","source_quote":"اقتباس حرفي من المذكرة للنص موضوع نقطة الضعف","suggestion":"اقتراح","reference_pattern":"نمط تسبيب مقترح إن وُجد"}],
 "missing_references":["مرجع مقترح"],
 "overall_assessment":"جيدة أو تحتاج تحسين","persuasiveness_score":"7",
 "key_recommendations":["توصية"]}
+
+تعليمات حقل source_quote: **حقل إلزامي** في كل حجة ونقطة ضعف — يجب أن يكون اقتباساً حرفياً (verbatim) من نص المذكرة المرفقة، يطابق ما كُتب فيها بالضبط، حتى يستطيع المستخدم تحديد موضع الملاحظة بسهولة.
 SYSTEM;
 
         try {

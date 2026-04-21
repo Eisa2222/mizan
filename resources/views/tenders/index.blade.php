@@ -1,3 +1,5 @@
+@section('title', 'توليد الكراسات')
+
 <x-app-layout>
     <div class="mz-screen">
         <div class="mz-page-head">
@@ -5,7 +7,9 @@
                 <div class="mz-page-title">✨ توليد الكراسات الذكي</div>
                 <div class="mz-page-sub">أدخل وصف المشروع وسيقوم النظام بتوليد كراسة شروط ومواصفات كاملة جاهزة للطرح</div>
             </div>
-            <a href="{{ route('tenders.create') }}" class="mz-btn mz-btn-gold">+ كراسة جديدة</a>
+            @can('tenders.create')
+                <a href="{{ route('tenders.create') }}" class="mz-btn mz-btn-gold">+ كراسة جديدة</a>
+            @endcan
         </div>
 
         <div class="mz-card">
@@ -44,17 +48,16 @@
                         </div>
                     </a>
                 @empty
-                    <div style="text-align:center;padding:48px 16px;color:var(--mute)">
-                        <div style="font-size:48px;margin-bottom:12px">✨</div>
-                        <div style="font-size:14px;margin-bottom:8px">لا توجد كراسات مولّدة بعد</div>
-                        <div style="font-size:12px">أنشئ كراسة جديدة وسيقوم النظام بتوليدها بالكامل خلال ثوانٍ</div>
-                    </div>
+                    <x-empty-state
+                        icon="✨"
+                        title="لا توجد كراسات مولّدة بعد"
+                        message="أنشئ كراسة جديدة وسيقوم النظام بتوليدها بالكامل خلال ثوانٍ."
+                        :action="auth()->user()->can('tenders.create') ? route('tenders.create') : null"
+                        :actionLabel="auth()->user()->can('tenders.create') ? '+ كراسة جديدة' : null" />
                 @endforelse
             </div>
         </div>
 
-        @if ($tenders->hasPages())
-            <div style="margin-top:16px">{{ $tenders->links() }}</div>
-        @endif
+        <x-pagination :paginator="$tenders" />
     </div>
 </x-app-layout>

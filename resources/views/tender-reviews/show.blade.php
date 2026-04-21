@@ -27,7 +27,7 @@
                     @if ($document->metadata['sector'] ?? null) · {{ $document->metadata['sector'] }} @endif
                 </div>
             </div>
-            <a href="{{ route('tender-reviews.index') }}" class="mz-btn mz-btn-ghost mz-btn-sm">← العودة للكراسات</a>
+            <a href="{{ route('tender-reviews.index') }}" class="mz-btn mz-btn-ghost mz-btn-sm"><span class="mz-back-arrow">←</span> العودة للكراسات</a>
         </div>
 
         @if (!$aiConfigured)
@@ -190,13 +190,15 @@
                                 </div>
                             </div>
 
-                            @if (!empty($f['current_text']))
-                                <div style="font-size:12px;color:var(--dim);background:rgba(255,255,255,.03);padding:8px 10px;border-radius:6px;margin-bottom:8px;line-height:1.6;border-right:2px solid var(--borderl)">
-                                    "{{ $f['current_text'] }}"
+                            @php $detectedText = $f['detected_text'] ?? $f['current_text'] ?? null; @endphp
+                            @if ($detectedText)
+                                <div class="mz-source-quote">
+                                    <span class="mz-source-quote-label">نص الكراسة</span>
+                                    {{ $detectedText }}
                                 </div>
                             @endif
 
-                            <div style="font-size:12px;color:var(--cream);line-height:1.7;margin-bottom:8px">{{ $f['issue'] ?? '' }}</div>
+                            <div style="font-size:12px;color:var(--cream);line-height:1.7;margin:8px 0">{{ $f['issue'] ?? '' }}</div>
 
                             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">
                                 @if (!empty($f['legal_reference']))

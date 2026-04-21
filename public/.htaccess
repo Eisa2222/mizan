@@ -1,9 +1,26 @@
+# Block direct HTTP access to Vite build metadata (audit #14).
+# manifest.json exposes source paths and hashed asset names; the browser
+# never needs it — only the server-side @vite() directive reads it.
+<FilesMatch "^manifest\.json$">
+    Require all denied
+</FilesMatch>
+<IfModule !mod_authz_core.c>
+    <FilesMatch "^manifest\.json$">
+        Order allow,deny
+        Deny from all
+    </FilesMatch>
+</IfModule>
+
 <IfModule mod_rewrite.c>
     <IfModule mod_negotiation.c>
         Options -MultiViews -Indexes
     </IfModule>
 
     RewriteEngine On
+
+    # Block /build/manifest.json specifically (FilesMatch above catches root
+    # manifest.json; this catches the nested path clients would hit first).
+    RewriteRule ^build/manifest\.json$ - [F,L]
 
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .

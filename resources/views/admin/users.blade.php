@@ -1,3 +1,5 @@
+@section('title', 'إدارة المستخدمين')
+
 <x-app-layout>
     <div class="mz-screen">
         <div class="mz-page-head">
@@ -8,12 +10,6 @@
             <a href="{{ route('admin.users.create') }}" class="mz-btn mz-btn-gold">+ إضافة مستخدم</a>
         </div>
 
-        @if (session('success'))
-            <div style="background:rgba(80,200,120,.12);border:1px solid rgba(80,200,120,.4);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#5c8">
-                {{ session('success') }}
-            </div>
-        @endif
-
         {{-- Filter by org --}}
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
             <a href="{{ route('admin.users') }}" class="mz-chip {{ !request('org') ? 'active' : '' }}">الكل</a>
@@ -22,51 +18,62 @@
             @endforeach
         </div>
 
-        <div class="mz-card" style="padding:0;overflow:hidden">
-            <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <div class="mz-datatable-wrap" x-data="{ q: '' }">
+            <div class="mz-datatable-toolbar">
+                <div class="mz-datatable-search">
+                    <input type="search" x-model="q" placeholder="ابحث عن مستخدم بالاسم أو البريد..." />
+                </div>
+                <div class="mz-datatable-info">
+                    {{ $users->total() }} مستخدم · عرض {{ $users->count() }} في الصفحة الحالية
+                </div>
+            </div>
+
+            <table class="mz-datatable">
                 <thead>
-                    <tr style="background:var(--card2);border-bottom:1px solid var(--borderl)">
-                        <th style="padding:10px 14px;text-align:right;color:var(--mute)">الاسم</th>
-                        <th style="padding:10px 14px;text-align:right;color:var(--mute)">البريد</th>
-                        <th style="padding:10px 14px;text-align:right;color:var(--mute)">الجهة</th>
-                        <th style="padding:10px 14px;text-align:right;color:var(--mute)">الصلاحية</th>
-                        <th style="padding:10px 14px;text-align:center;color:var(--mute);width:200px">تغيير الصلاحية</th>
+                    <tr>
+                        <th>الاسم</th>
+                        <th>البريد</th>
+                        <th>الجهة</th>
+                        <th>الصلاحية</th>
+                        <th style="text-align:center;width:220px">تغيير الصلاحية</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach ($users as $u)
-                        <tr style="border-bottom:1px solid var(--borderl)">
-                            <td style="padding:10px 14px;color:var(--cream);font-weight:600">{{ $u->name }}</td>
-                            <td style="padding:10px 14px;color:var(--dim)" dir="ltr">{{ $u->email }}</td>
-                            <td style="padding:10px 14px;color:var(--dim)">{{ $u->organization?->name_ar ?? '—' }}</td>
-                            <td style="padding:10px 14px">
-                                <span style="background:rgba(200,169,75,.15);color:var(--gold);padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700">
-                                    {{ $u->role?->label() ?? '—' }}
+                    @forelse ($users as $user)
+                        <tr x-show="!q || {{ json_encode(mb_strtolower($user->name . ' ' . $user->email . ' ' . ($user->organization?->name_ar ?? '')), JSON_UNESCAPED_UNICODE) }}.includes(q.toLowerCase())">
+                            <td style="font-weight:600">{{ $user->name }}</td>
+                            <td dir="ltr" style="color:var(--dim)">{{ $user->email }}</td>
+                            <td style="color:var(--dim)">{{ $user->organization?->name_ar ?? '—' }}</td>
+                            <td>
+                                <span style="background:rgba(200,169,75,.15);color:var(--gold);padding:3px 10px;border-radius:8px;font-size:11px;font-weight:700">
+                                    {{ $user->role?->label() ?? '—' }}
                                 </span>
                             </td>
-                            <td style="padding:6px 14px;text-align:center">
-                                @if ($u->role !== \App\Enums\UserRole::SuperAdmin)
-                                    <form method="POST" action="{{ route('admin.users.update-role', $u) }}" style="display:flex;gap:6px;justify-content:center">
+                            <td style="text-align:center">
+                                @if ($user->role !== \App\Enums\UserRole::SuperAdmin)
+                                    <form method="POST" action="{{ route('admin.users.update-role', $user) }}" style="display:flex;gap:6px;justify-content:center;align-items:center">
                                         @csrf @method('PATCH')
-                                        <select name="role" class="mz-inp" style="font-size:11px;padding:4px 8px;width:130px">
+                                        <select name="role" class="mz-inp" style="font-size:12px;padding:6px 28px 6px 10px;width:140px">
                                             @foreach (\App\Enums\UserRole::cases() as $role)
                                                 @if ($role !== \App\Enums\UserRole::SuperAdmin)
-                                                    <option value="{{ $role->value }}" {{ $u->role === $role ? 'selected' : '' }}>{{ $role->label() }}</option>
+                                                    <option value="{{ $role->value }}" {{ $user->role === $role ? 'selected' : '' }}>{{ $role->label() }}</option>
                                                 @endif
                                             @endforeach
                                         </select>
-                                        <button type="submit" class="mz-btn mz-btn-ghost mz-btn-sm" style="font-size:11px;padding:4px 8px">تحديث</button>
+                                        <button type="submit" class="mz-btn mz-btn-ghost mz-btn-sm">تحديث</button>
                                     </form>
                                 @else
                                     <span style="font-size:11px;color:var(--mute)">مدير عام</span>
                                 @endif
                             </td>
                         </tr>
-                    @endforeach
+                    @empty
+                        <tr><td colspan="5" class="mz-datatable-empty">لا يوجد مستخدمون</td></tr>
+                    @endforelse
                 </tbody>
             </table>
         </div>
 
-        <div style="margin-top:16px">{{ $users->links() }}</div>
+        <x-pagination :paginator="$users" />
     </div>
 </x-app-layout>

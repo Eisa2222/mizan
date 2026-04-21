@@ -5,7 +5,7 @@
                 <div class="mz-page-title">رفع مستند جديد</div>
                 <div class="mz-page-sub">أضف مستنداً قانونياً للمكتبة</div>
             </div>
-            <a href="{{ route('documents.index') }}" class="mz-btn mz-btn-ghost mz-btn-sm">← العودة</a>
+            <a href="{{ route('documents.index') }}" class="mz-btn mz-btn-ghost mz-btn-sm"><span class="mz-back-arrow">←</span> العودة</a>
         </div>
 
         <form method="POST" action="{{ route('documents.store') }}" enctype="multipart/form-data" class="mz-card" style="max-width:760px;padding:24px">

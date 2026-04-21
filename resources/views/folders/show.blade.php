@@ -5,7 +5,7 @@
                 <div class="mz-page-title">📁 {{ $folder->name }}</div>
                 <div class="mz-page-sub">بواسطة {{ $folder->owner?->name }} · {{ $folder->created_at->diffForHumans() }}</div>
             </div>
-            <a href="{{ route('folders.index') }}" class="mz-btn mz-btn-ghost mz-btn-sm">← العودة</a>
+            <a href="{{ route('folders.index') }}" class="mz-btn mz-btn-ghost mz-btn-sm"><span class="mz-back-arrow">←</span> العودة</a>
         </div>
 
         @if ($folder->description)
@@ -29,11 +29,13 @@
                                     <div style="font-size:13px;font-weight:700;color:var(--cream)">{{ $doc->title }}</div>
                                     <div style="font-size:11px;color:var(--mute)">{{ $doc->type_label }}</div>
                                 </a>
-                                <form method="POST" action="{{ route('folders.removeDocument', [$folder, $doc->id]) }}">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" style="background:transparent;border:none;color:var(--red);cursor:pointer;font-size:14px">✕</button>
-                                </form>
+                                @can('view', $folder)
+                                    <form method="POST" action="{{ route('folders.removeDocument', [$folder, $doc->id]) }}">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" style="background:transparent;border:none;color:var(--red);cursor:pointer;font-size:14px">✕</button>
+                                    </form>
+                                @endcan
                             </div>
                         @empty
                             <p style="text-align:center;padding:24px;color:var(--mute);font-size:13px">لا توجد مستندات في هذا المجلد</p>
@@ -116,17 +118,17 @@
                                     <div style="font-size:12.5px;font-weight:700;color:var(--cream)">{{ $m->user?->name }}</div>
                                     <div style="font-size:10px;color:var(--mute)">{{ \App\Models\FolderMember::ROLES[$m->role] ?? $m->role }}</div>
                                 </div>
-                                @if ($folder->owner_id === auth()->id())
+                                @can('manageMembers', $folder)
                                     <form method="POST" action="{{ route('folders.removeMember', [$folder, $m->user_id]) }}">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" style="background:transparent;border:none;color:var(--red);cursor:pointer">✕</button>
                                     </form>
-                                @endif
+                                @endcan
                             </div>
                         @endforeach
 
-                        @if ($folder->owner_id === auth()->id() && $orgUsers->count() > 0)
+                        @if (auth()->user()->can('manageMembers', $folder) && $orgUsers->count() > 0)
                             <form method="POST" action="{{ route('folders.addMember', $folder) }}" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--borderl)">
                                 @csrf
                                 <select name="user_id" required class="mz-inp" style="margin-bottom:8px">
@@ -146,14 +148,14 @@
                     </div>
                 </div>
 
-                @if ($folder->owner_id === auth()->id())
+                @can('delete', $folder)
                     <form method="POST" action="{{ route('folders.destroy', $folder) }}"
                           onsubmit="return confirm('هل أنت متأكد من حذف هذا المجلد؟')">
                         @csrf
                         @method('DELETE')
                         <button type="submit" class="mz-btn mz-btn-ghost" style="width:100%;color:var(--red);border-color:rgba(224,85,85,.25)">🗑 حذف المجلد</button>
                     </form>
-                @endif
+                @endcan
             </div>
         </div>
     </div>

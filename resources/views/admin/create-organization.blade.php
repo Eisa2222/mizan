@@ -5,7 +5,7 @@
                 <div class="mz-page-title">إنشاء جهة جديدة</div>
                 <div class="mz-page-sub">سجّل جهة جديدة مع حساب المسؤول الأول</div>
             </div>
-            <a href="{{ route('admin.organizations') }}" class="mz-btn mz-btn-ghost mz-btn-sm">← العودة</a>
+            <a href="{{ route('admin.organizations') }}" class="mz-btn mz-btn-ghost mz-btn-sm"><span class="mz-back-arrow">←</span> العودة</a>
         </div>
 
         @if ($errors->any())

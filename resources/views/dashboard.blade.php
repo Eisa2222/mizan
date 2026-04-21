@@ -1,3 +1,5 @@
+@section('title', 'لوحة التحكم')
+
 <x-app-layout>
     @php
         $statusLabels = \App\Models\Task::STATUSES;
@@ -9,37 +11,77 @@
     <div class="mz-screen">
         <div class="mz-page-head">
             <div>
-                <div class="mz-page-title">مرحباً، {{ auth()->user()->name }} 👋</div>
+                <h1 class="mz-page-title">مرحباً، {{ auth()->user()->name }} 👋</h1>
                 <div class="mz-page-sub">{{ now()->locale('ar')->isoFormat('dddd، D MMMM YYYY') }}</div>
             </div>
-            <a href="{{ route('documents.index') }}" class="mz-btn mz-btn-gold">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <a href="{{ route('search') }}" class="mz-btn mz-btn-gold" aria-label="ابدأ بحثاً قانونياً جديداً">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
                 بحث قانوني جديد
             </a>
         </div>
 
-        {{-- Stat cards --}}
-        <div class="mz-g4">
-            <div class="mz-stat" style="--accent:var(--gold)">
-                <div class="mz-stat-icon">📚</div>
-                <div class="mz-stat-val">{{ number_format($documentsCount) }}</div>
-                <div class="mz-stat-label">المستندات القانونية</div>
-            </div>
-            <div class="mz-stat" style="--accent:var(--blue)">
-                <div class="mz-stat-icon">✅</div>
-                <div class="mz-stat-val">{{ number_format($tasksCount) }}</div>
-                <div class="mz-stat-label">إجمالي المهام</div>
-            </div>
-            <div class="mz-stat" style="--accent:var(--green)">
-                <div class="mz-stat-icon">⏳</div>
-                <div class="mz-stat-val">{{ number_format($tasksByStatus[2] ?? 0) }}</div>
-                <div class="mz-stat-label">قيد التنفيذ</div>
-            </div>
-            <div class="mz-stat" style="--accent:var(--red)">
-                <div class="mz-stat-icon">⚠️</div>
-                <div class="mz-stat-val">{{ number_format($overdueTasks) }}</div>
-                <div class="mz-stat-label">مهام متأخرة</div>
-            </div>
+        {{-- Primary stat cards --}}
+        <div class="mz-g4" role="list" aria-label="إحصائيات رئيسية">
+            <a href="{{ route('documents.index') }}" class="mz-stat" style="--accent:var(--gold);text-decoration:none"
+               role="listitem"
+               aria-label="{{ number_format($documentsCount) }} مستند قانوني — اضغط للعرض">
+                <div class="mz-stat-icon" aria-hidden="true">📚</div>
+                <div class="mz-stat-val" aria-hidden="true">{{ number_format($documentsCount) }}</div>
+                <div class="mz-stat-label" aria-hidden="true">المستندات القانونية</div>
+            </a>
+            <a href="{{ route('tasks.index') }}" class="mz-stat" style="--accent:var(--blue);text-decoration:none"
+               role="listitem"
+               aria-label="{{ number_format($tasksCount) }} مهمة في الجهة — اضغط للعرض">
+                <div class="mz-stat-icon" aria-hidden="true">✅</div>
+                <div class="mz-stat-val" aria-hidden="true">{{ number_format($tasksCount) }}</div>
+                <div class="mz-stat-label" aria-hidden="true">إجمالي مهام الجهة</div>
+            </a>
+            <a href="{{ route('tasks.index') }}" class="mz-stat" style="--accent:var(--green);text-decoration:none"
+               role="listitem"
+               aria-label="{{ number_format($tasksByStatus[2] ?? 0) }} مهمة قيد التنفيذ">
+                <div class="mz-stat-icon" aria-hidden="true">⏳</div>
+                <div class="mz-stat-val" aria-hidden="true">{{ number_format($tasksByStatus[2] ?? 0) }}</div>
+                <div class="mz-stat-label" aria-hidden="true">قيد التنفيذ</div>
+            </a>
+            <a href="{{ route('tasks.index') }}" class="mz-stat" style="--accent:var(--red);text-decoration:none"
+               role="listitem"
+               aria-label="{{ number_format($overdueTasks) }} مهمة متأخرة تحتاج متابعة">
+                <div class="mz-stat-icon" aria-hidden="true">⚠️</div>
+                <div class="mz-stat-val" aria-hidden="true">{{ number_format($overdueTasks) }}</div>
+                <div class="mz-stat-label" aria-hidden="true">مهام متأخرة</div>
+            </a>
+        </div>
+
+        {{-- Secondary stats --}}
+        <div class="mz-g4" style="margin-top:14px" role="list" aria-label="إحصائيات الخدمات القانونية">
+            <a href="{{ route('contract-reviews.index') }}" class="mz-stat" style="--accent:#c8a94b;text-decoration:none"
+               role="listitem"
+               aria-label="{{ number_format($contractReviewsCount ?? 0) }} عقد تمت مراجعته">
+                <div class="mz-stat-icon" aria-hidden="true">📝</div>
+                <div class="mz-stat-val" aria-hidden="true">{{ number_format($contractReviewsCount ?? 0) }}</div>
+                <div class="mz-stat-label" aria-hidden="true">عقود تمت مراجعتها</div>
+            </a>
+            <a href="{{ route('tenders.index') }}" class="mz-stat" style="--accent:#b88bff;text-decoration:none"
+               role="listitem"
+               aria-label="{{ number_format($tendersCount ?? 0) }} كراسة مولّدة">
+                <div class="mz-stat-icon" aria-hidden="true">✨</div>
+                <div class="mz-stat-val" aria-hidden="true">{{ number_format($tendersCount ?? 0) }}</div>
+                <div class="mz-stat-label" aria-hidden="true">كراسات مولّدة</div>
+            </a>
+            <a href="{{ route('memos.index') }}" class="mz-stat" style="--accent:#7dd3c0;text-decoration:none"
+               role="listitem"
+               aria-label="{{ number_format($memosCount ?? 0) }} مذكرة محللة">
+                <div class="mz-stat-icon" aria-hidden="true">📄</div>
+                <div class="mz-stat-val" aria-hidden="true">{{ number_format($memosCount ?? 0) }}</div>
+                <div class="mz-stat-label" aria-hidden="true">مذكرات محللة</div>
+            </a>
+            <a href="{{ route('notifications.index') }}" class="mz-stat" style="--accent:#f5a26b;text-decoration:none"
+               role="listitem"
+               aria-label="{{ number_format($unreadNotificationsCount ?? 0) }} إشعار غير مقروء">
+                <div class="mz-stat-icon" aria-hidden="true">🔔</div>
+                <div class="mz-stat-val" aria-hidden="true">{{ number_format($unreadNotificationsCount ?? 0) }}</div>
+                <div class="mz-stat-label" aria-hidden="true">إشعارات غير مقروءة</div>
+            </a>
         </div>
 
         {{-- Quick actions + activity --}}
@@ -65,7 +107,7 @@
                     <a href="{{ route('notifications.index') }}" class="mz-qa">
                         <div class="mz-qa-icon">🔔</div>
                         <div class="mz-qa-label">الإشعارات</div>
-                        <div class="mz-qa-sub">@php $u = \App\Models\AppNotification::where('user_id', auth()->id())->whereNull('read_at')->count(); @endphp{{ $u }} جديدة</div>
+                        <div class="mz-qa-sub">{{ $unreadNotificationsCount ?? 0 }} جديدة</div>
                     </a>
                 </div>
 

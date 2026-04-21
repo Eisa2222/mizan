@@ -46,4 +46,19 @@ class User extends Authenticatable
     {
         return $this->role?->isAtLeast($role) ?? false;
     }
+
+    /**
+     * Check if this user's role grants the given dotted permission.
+     * Accepts either a Permission enum case or the raw dotted string.
+     */
+    public function hasPermission(\App\Enums\Permission|string $permission): bool
+    {
+        if ($this->role === null) {
+            return false;
+        }
+
+        return $permission instanceof \App\Enums\Permission
+            ? $this->role->hasPermission($permission)
+            : $this->role->hasPermissionString($permission);
+    }
 }

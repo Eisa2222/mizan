@@ -80,7 +80,7 @@ class TenderReviewJob implements ShouldQueue
             $len = $contentLengths[$attempt - 1];
             try {
                 $raw = $claude->chat(
-                    messages: [['role' => 'user', 'content' => "راجع كراسة الشروط والمواصفات التالية وأرجع ملاحظاتك **بالعربية الفصحى فقط** — ممنوع الإنجليزية. اكتب 5 ملاحظات على الأقل. JSON بالشكل: {\"findings\":[{\"issue_title\":\"عنوان عربي\",\"severity\":\"Critical|High|Medium|Improvement\",\"why_it_is_an_issue\":\"شرح عربي\",\"recommendation\":\"توصية عربية\"}]}\n\nالكراسة:\n" . mb_substr($content, 0, $len)]],
+                    messages: [['role' => 'user', 'content' => "راجع كراسة الشروط والمواصفات التالية وأرجع ملاحظاتك **بالعربية الفصحى فقط** — ممنوع الإنجليزية. اكتب 5 ملاحظات على الأقل. **حقل detected_text إلزامي** ويجب أن يكون اقتباساً حرفياً (verbatim) من نص الكراسة المرفق — ليطابق ما كُتب بالضبط حتى يستطيع المراجع تحديد موضع الملاحظة بسرعة. JSON بالشكل: {\"findings\":[{\"issue_title\":\"عنوان عربي\",\"severity\":\"Critical|High|Medium|Improvement\",\"detected_text\":\"اقتباس حرفي كامل من الكراسة يمثل النص موضوع الملاحظة\",\"why_it_is_an_issue\":\"شرح عربي\",\"recommendation\":\"توصية عربية\"}]}\n\nالكراسة:\n" . mb_substr($content, 0, $len)]],
                     system: $findingsSystem,
                     maxTokens: 3000,
                 );

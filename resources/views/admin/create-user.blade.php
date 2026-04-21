@@ -5,7 +5,7 @@
                 <div class="mz-page-title">إضافة مستخدم جديد</div>
                 <div class="mz-page-sub">إنشاء حساب مستخدم وتعيين الجهة والصلاحية</div>
             </div>
-            <a href="{{ route('admin.users') }}" class="mz-btn mz-btn-ghost mz-btn-sm">← العودة</a>
+            <a href="{{ route('admin.users') }}" class="mz-btn mz-btn-ghost mz-btn-sm"><span class="mz-back-arrow">←</span> العودة</a>
         </div>
 
         @if ($errors->any())

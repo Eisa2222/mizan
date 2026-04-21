@@ -5,7 +5,7 @@
                 <div class="mz-page-title">إنشاء مجلد جديد</div>
                 <div class="mz-page-sub">نظّم مستنداتك وشاركها مع فريقك</div>
             </div>
-            <a href="{{ route('folders.index') }}" class="mz-btn mz-btn-ghost mz-btn-sm">← العودة</a>
+            <a href="{{ route('folders.index') }}" class="mz-btn mz-btn-ghost mz-btn-sm"><span class="mz-back-arrow">←</span> العودة</a>
         </div>
 
         <form method="POST" action="{{ route('folders.store') }}" class="mz-card" style="max-width:600px;padding:24px">

@@ -1,3 +1,5 @@
+@section('title', 'سير العمل والمهام')
+
 <x-app-layout>
     @php
         $columns = [1, 2, 3, 4]; // exclude Cancelled (5)

@@ -7,7 +7,7 @@
                     على المستند: <a href="{{ route('documents.show', $discussion->document) }}" style="color:var(--gold);text-decoration:none">{{ $discussion->document->title }}</a>
                 </div>
             </div>
-            <a href="{{ route('documents.show', $discussion->document) }}" class="mz-btn mz-btn-ghost mz-btn-sm">← العودة للمستند</a>
+            <a href="{{ route('documents.show', $discussion->document) }}" class="mz-btn mz-btn-ghost mz-btn-sm"><span class="mz-back-arrow">←</span> العودة للمستند</a>
         </div>
 
         {{-- Original post --}}

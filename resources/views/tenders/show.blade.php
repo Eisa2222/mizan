@@ -17,40 +17,46 @@
                 </div>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-                {{-- Workflow actions --}}
-                @if (in_array($tender->workflow_status, ['draft', 'rejected']))
+                {{-- Workflow actions — TenderPolicy enforces the workflow_status + role checks --}}
+                @can('submit', $tender)
                     <form method="POST" action="{{ route('tenders.submit', $tender) }}" style="display:inline">
                         @csrf
                         <button type="submit" class="mz-btn mz-btn-gold mz-btn-sm">📤 إرسال للاعتماد</button>
                     </form>
-                @endif
+                @endcan
 
-                @if ($tender->workflow_status === 'submitted' && auth()->user()->hasAtLeastRole(\App\Enums\UserRole::LegalCounsel))
+                @can('approve', $tender)
                     <form method="POST" action="{{ route('tenders.approve', $tender) }}" style="display:inline">
                         @csrf
                         <button type="submit" class="mz-btn mz-btn-sm" style="background:#3dbf8a;color:#fff">✅ اعتماد</button>
                     </form>
+                @endcan
+                @can('reject', $tender)
                     <form method="POST" action="{{ route('tenders.reject', $tender) }}" style="display:inline"
                           x-data onsubmit="event.preventDefault(); let r = prompt('سبب الرفض:'); if(r && r.length >= 5) { let i = document.createElement('input'); i.type='hidden'; i.name='rejection_reason'; i.value=r; this.appendChild(i); this.submit(); } else if(r) { alert('السبب يجب أن يكون 5 أحرف على الأقل'); }">
                         @csrf
                         <button type="submit" class="mz-btn mz-btn-sm" style="background:#e55;color:#fff">❌ رفض</button>
                     </form>
-                @endif
+                @endcan
 
-                <form method="POST" action="{{ route('tenders.review', $tender) }}" style="display:inline">
-                    @csrf
-                    <button type="submit" class="mz-btn mz-btn-ghost mz-btn-sm">⚖ مراجعة الامتثال</button>
-                </form>
-                @if ($tender->workflow_status !== 'approved')
-                    <form method="POST" action="{{ route('tenders.regenerate', $tender) }}" style="display:inline"
-                          onsubmit="return confirm('سيتم استبدال جميع الأقسام والبنود. هل أنت متأكد؟')">
+                @can('update', $tender)
+                    <form method="POST" action="{{ route('tenders.review', $tender) }}" style="display:inline">
                         @csrf
-                        <button type="submit" class="mz-btn mz-btn-ghost mz-btn-sm">🔄 إعادة التوليد</button>
+                        <button type="submit" class="mz-btn mz-btn-ghost mz-btn-sm">⚖ مراجعة الامتثال</button>
                     </form>
-                @endif
-                <a href="{{ route('tenders.export.pdf', $tender) }}" class="mz-btn mz-btn-ghost mz-btn-sm">📄 PDF</a>
-                <a href="{{ route('tenders.export.docx', $tender) }}" class="mz-btn mz-btn-ghost mz-btn-sm">📝 Word</a>
-                <a href="{{ route('tenders.index') }}" class="mz-btn mz-btn-ghost mz-btn-sm">← العودة</a>
+                    @if ($tender->workflow_status !== 'approved')
+                        <form method="POST" action="{{ route('tenders.regenerate', $tender) }}" style="display:inline"
+                              onsubmit="return confirm('سيتم استبدال جميع الأقسام والبنود. هل أنت متأكد؟')">
+                            @csrf
+                            <button type="submit" class="mz-btn mz-btn-ghost mz-btn-sm">🔄 إعادة التوليد</button>
+                        </form>
+                    @endif
+                @endcan
+                @can('export', $tender)
+                    <a href="{{ route('tenders.export.pdf', $tender) }}" class="mz-btn mz-btn-ghost mz-btn-sm">📄 PDF</a>
+                    <a href="{{ route('tenders.export.docx', $tender) }}" class="mz-btn mz-btn-ghost mz-btn-sm">📝 Word</a>
+                @endcan
+                <a href="{{ route('tenders.index') }}" class="mz-btn mz-btn-ghost mz-btn-sm"><span class="mz-back-arrow">←</span> العودة</a>
             </div>
         </div>
 

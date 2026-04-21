@@ -5,7 +5,7 @@
                 <div class="mz-page-title">✨ كراسة جديدة</div>
                 <div class="mz-page-sub">أكمل الخطوات الخمس وسيقوم النظام بتوليد كراسة كاملة</div>
             </div>
-            <a href="{{ route('tenders.index') }}" class="mz-btn mz-btn-ghost mz-btn-sm">← العودة</a>
+            <a href="{{ route('tenders.index') }}" class="mz-btn mz-btn-ghost mz-btn-sm"><span class="mz-back-arrow">←</span> العودة</a>
         </div>
 
         {{-- Validation errors --}}

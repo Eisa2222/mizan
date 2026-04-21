@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\TenderStatus;
+use App\Enums\TenderWorkflowStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -119,11 +121,73 @@ class Tender extends Model
 
     public function getTypeLabelAttribute(): string
     {
-        return self::TYPES[$this->type] ?? '—';
+        return self::typeLabel($this->type);
     }
 
     public function getStatusLabelAttribute(): string
     {
-        return self::STATUSES[$this->status] ?? '—';
+        return self::statusLabel($this->status);
+    }
+
+    /**
+     * Translate a tender type key. Falls back to the Arabic label hard-coded
+     * in self::TYPES so old callers that rely on the const still work; prefer
+     * this helper everywhere new so labels can be translated per locale
+     * without touching the model.
+     */
+    public static function typeLabel(?string $type): string
+    {
+        if ($type === null) {
+            return '—';
+        }
+
+        $translated = trans("tenders.types.$type");
+        if (is_string($translated) && $translated !== "tenders.types.$type") {
+            return $translated;
+        }
+
+        return self::TYPES[$type] ?? '—';
+    }
+
+    public static function statusLabel(?string $status): string
+    {
+        if ($status === null) {
+            return '—';
+        }
+
+        $translated = trans("tenders.statuses.$status");
+        if (is_string($translated) && $translated !== "tenders.statuses.$status") {
+            return $translated;
+        }
+
+        return self::STATUSES[$status] ?? '—';
+    }
+
+    public static function workflowLabel(?string $workflow): string
+    {
+        if ($workflow === null) {
+            return '—';
+        }
+
+        $translated = trans("tenders.workflow.$workflow");
+        if (is_string($translated) && $translated !== "tenders.workflow.$workflow") {
+            return $translated;
+        }
+
+        return self::WORKFLOW[$workflow] ?? '—';
+    }
+
+    /** Typed view of the string status column. */
+    public function statusEnum(): ?TenderStatus
+    {
+        return $this->status !== null ? TenderStatus::tryFrom((string) $this->status) : null;
+    }
+
+    /** Typed view of the string workflow_status column. */
+    public function workflowEnum(): ?TenderWorkflowStatus
+    {
+        return $this->workflow_status !== null
+            ? TenderWorkflowStatus::tryFrom((string) $this->workflow_status)
+            : null;
     }
 }

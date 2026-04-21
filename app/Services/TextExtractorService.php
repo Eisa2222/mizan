@@ -251,16 +251,20 @@ class TextExtractorService
         if (filesize($path) > 30 * 1024 * 1024) return null; // 30MB limit
 
         // Preferred: Poppler's pdftotext — handles Arabic shaping + RTL correctly.
+        // Require a meaningful chunk of text (≥100 chars) before trusting Poppler;
+        // otherwise scanned PDFs that yield an empty string would short-circuit
+        // the OCR fallback because looksValid("") returns true via the <30-char
+        // shortcut.
         $popplerText = $this->extractPdfViaPoppler($path);
-        if ($popplerText !== null && $this->looksValid($popplerText)) {
+        $popplerLen  = $popplerText !== null ? mb_strlen(trim($popplerText)) : 0;
+        if ($popplerLen >= 100 && $this->looksValid($popplerText)) {
             return $popplerText;
         }
 
-        // If Poppler returned almost nothing (< 100 chars) the PDF is likely
-        // scanned (image-based). Try OCR as a last resort — slower but works
-        // on scanned documents. For text PDFs, OCR produces worse output so
-        // we only use it when direct extraction fails.
-        if ($popplerText === null || mb_strlen(trim($popplerText)) < 100) {
+        // Poppler returned nothing or very little — almost certainly a scanned
+        // (image-based) PDF. Try OCR as a last resort. For text PDFs we have
+        // already returned above, so OCR only runs when direct extraction fails.
+        if ($popplerLen < 100) {
             $ocrText = $this->extractPdfViaOcr($path, 30);
             if ($ocrText !== null && $this->looksValid($ocrText)) {
                 return $ocrText;
@@ -576,6 +580,12 @@ class TextExtractorService
         // Strip null bytes and most control chars (keep \n and \t)
         $text = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $text) ?? $text;
 
+        // Remove MS-Word cross-reference error strings that leak into extracted
+        // text when the source .docx has broken bookmarks/references. These are
+        // Word's own rendering of unresolved fields — they're meaningless noise
+        // that confuses the AI prompts and pollutes the reader's view.
+        $text = $this->stripWordFieldErrors($text);
+
         // Collapse internal runs of spaces (but keep newlines)
         $text = preg_replace('/[ \t]+/u', ' ', $text) ?? $text;
 
@@ -583,5 +593,29 @@ class TextExtractorService
         $text = preg_replace('/\n{3,}/', "\n\n", $text) ?? $text;
 
         return trim($text);
+    }
+
+    /**
+     * Strip the English-only error sentinels Word inserts when a field code
+     * fails to resolve. They always render inline with no surrounding syntax,
+     * so a literal string replace is safe across languages.
+     */
+    private function stripWordFieldErrors(string $text): string
+    {
+        $needles = [
+            'Error! Bookmark not defined.',
+            'Error! Reference source not found.',
+            'Error! Hyperlink reference not valid.',
+            'Error! Unknown switch argument.',
+            'Error! Main Document Only.',
+            'Error! Not a valid filename.',
+            'Error! Not a valid link.',
+            'Error! Objects cannot be created from editing field codes.',
+            'خطأ! لم يتم تعريف الإشارة المرجعية.',
+            'خطأ! المرجع غير موجود.',
+            'خطأ! مرجع الارتباط التشعبي غير صالح.',
+        ];
+
+        return str_replace($needles, '', $text);
     }
 }

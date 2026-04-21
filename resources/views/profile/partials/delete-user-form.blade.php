@@ -1,55 +1,43 @@
-<section class="space-y-6">
-    <header>
-        <h2 class="text-lg font-medium text-gray-900">
-            {{ __('Delete Account') }}
-        </h2>
+<p style="font-size:12.5px;color:var(--mute);margin:0 0 16px;line-height:1.7">
+    بعد حذف الحساب، ستُمحى جميع بياناتك ومواردك نهائياً. يُرجى تنزيل أي بيانات ترغب بالاحتفاظ بها قبل المتابعة.
+</p>
 
-        <p class="mt-1 text-sm text-gray-600">
-            {{ __('Once your account is deleted, all of its resources and data will be permanently deleted. Before deleting your account, please download any data or information that you wish to retain.') }}
-        </p>
-    </header>
-
-    <x-danger-button
+<button type="button"
+        class="mz-btn"
+        style="background:rgba(224,85,85,.15);color:#e05555;border-color:rgba(224,85,85,.35)"
         x-data=""
-        x-on:click.prevent="$dispatch('open-modal', 'confirm-user-deletion')"
-    >{{ __('Delete Account') }}</x-danger-button>
+        x-on:click.prevent="$dispatch('open-modal', 'confirm-user-deletion')">
+    حذف الحساب
+</button>
 
-    <x-modal name="confirm-user-deletion" :show="$errors->userDeletion->isNotEmpty()" focusable>
-        <form method="post" action="{{ route('profile.destroy') }}" class="p-6">
-            @csrf
-            @method('delete')
+<x-modal name="confirm-user-deletion" :show="$errors->userDeletion->isNotEmpty()" focusable>
+    <form method="post" action="{{ route('profile.destroy') }}" style="padding:24px">
+        @csrf
+        @method('delete')
 
-            <h2 class="text-lg font-medium text-gray-900">
-                {{ __('Are you sure you want to delete your account?') }}
-            </h2>
+        <h3 style="font-size:16px;font-weight:700;color:var(--ink);margin:0 0 8px">
+            هل أنت متأكد من حذف حسابك؟
+        </h3>
 
-            <p class="mt-1 text-sm text-gray-600">
-                {{ __('Once your account is deleted, all of its resources and data will be permanently deleted. Please enter your password to confirm you would like to permanently delete your account.') }}
-            </p>
+        <p style="font-size:12.5px;color:var(--mute);margin:0 0 16px;line-height:1.7">
+            بعد حذف الحساب، ستُمحى جميع البيانات نهائياً. أدخل كلمة المرور لتأكيد رغبتك في الحذف الدائم.
+        </p>
 
-            <div class="mt-6">
-                <x-input-label for="password" value="{{ __('Password') }}" class="sr-only" />
+        <div class="mz-form-group">
+            <label for="password" class="mz-flabel" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">كلمة المرور</label>
+            <input id="password" name="password" type="password"
+                   class="mz-inp" dir="ltr" placeholder="كلمة المرور">
+            @foreach ($errors->userDeletion->get('password') as $message)
+                <div class="mz-form-error">{{ $message }}</div>
+            @endforeach
+        </div>
 
-                <x-text-input
-                    id="password"
-                    name="password"
-                    type="password"
-                    class="mt-1 block w-3/4"
-                    placeholder="{{ __('Password') }}"
-                />
-
-                <x-input-error :messages="$errors->userDeletion->get('password')" class="mt-2" />
-            </div>
-
-            <div class="mt-6 flex justify-end">
-                <x-secondary-button x-on:click="$dispatch('close')">
-                    {{ __('Cancel') }}
-                </x-secondary-button>
-
-                <x-danger-button class="ms-3">
-                    {{ __('Delete Account') }}
-                </x-danger-button>
-            </div>
-        </form>
-    </x-modal>
-</section>
+        <div class="mz-form-actions" style="justify-content:flex-end;gap:8px">
+            <button type="button" class="mz-btn" x-on:click="$dispatch('close')">إلغاء</button>
+            <button type="submit" class="mz-btn"
+                    style="background:#e05555;color:#fff;border-color:#e05555">
+                تأكيد الحذف
+            </button>
+        </div>
+    </form>
+</x-modal>

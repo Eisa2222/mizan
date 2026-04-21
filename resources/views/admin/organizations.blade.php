@@ -1,3 +1,5 @@
+@section('title', 'إدارة الجهات')
+
 <x-app-layout>
     <div class="mz-screen">
         <div class="mz-page-head">

@@ -1,3 +1,5 @@
+@section('title', 'المجلدات')
+
 <x-app-layout>
     <div class="mz-screen">
         <div class="mz-page-head">
@@ -5,7 +7,9 @@
                 <div class="mz-page-title">المجلدات</div>
                 <div class="mz-page-sub">{{ $folders->count() }} مجلد · مشاركة المستندات مع فريقك</div>
             </div>
-            <a href="{{ route('folders.create') }}" class="mz-btn mz-btn-gold">+ مجلد جديد</a>
+            @can('folders.create')
+                <a href="{{ route('folders.create') }}" class="mz-btn mz-btn-gold">+ مجلد جديد</a>
+            @endcan
         </div>
 
         <div class="mz-g3">

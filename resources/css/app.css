@@ -1,3 +1,5 @@
+@import "./fonts.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -42,7 +44,7 @@
 
 html, body {
     height: 100%;
-    font-family: 'Tajawal', sans-serif;
+    font-family: 'Cairo', 'Tajawal', sans-serif;
     background: var(--bg);
     color: var(--cream);
     direction: rtl;
@@ -116,7 +118,7 @@ body { overflow: hidden; }
 .mz-tb-search svg { color: var(--mute); flex-shrink: 0; }
 .mz-tb-search input {
     flex: 1; background: transparent; border: none; outline: none;
-    color: var(--cream); font-family: 'Tajawal', sans-serif; font-size: 13px; direction: rtl;
+    color: var(--cream); font-family: 'Cairo', 'Tajawal', sans-serif; font-size: 13px; direction: rtl;
 }
 .mz-tb-search input::placeholder { color: var(--mute); }
 
@@ -293,7 +295,7 @@ body { overflow: hidden; }
     display: inline-flex; align-items: center; gap: 7px;
     padding: 9px 18px;
     border-radius: 8px;
-    font-family: 'Tajawal', sans-serif;
+    font-family: 'Cairo', 'Tajawal', sans-serif;
     font-size: 13px; font-weight: 700;
     cursor: pointer; border: none;
     transition: all .2s;
@@ -324,7 +326,7 @@ body { overflow: hidden; }
     border-radius: 8px;
     padding: 9px 13px;
     color: var(--cream);
-    font-family: 'Tajawal', sans-serif;
+    font-family: 'Cairo', 'Tajawal', sans-serif;
     font-size: 13px;
     direction: rtl;
     width: 100%;
@@ -796,7 +798,7 @@ body { overflow: hidden; }
     border: none;
     outline: none;
     color: var(--cream);
-    font-family: 'Tajawal', sans-serif;
+    font-family: 'Cairo', 'Tajawal', sans-serif;
     font-size: 15px;
     direction: rtl;
 }
@@ -955,4 +957,1079 @@ body { overflow: hidden; }
     background: rgba(61, 191, 138, .12);
     border: 1px solid var(--green);
     color: var(--green);
+}
+
+/* ───────────────────────────────────────────
+   TOASTER — session flash notifications
+─────────────────────────────────────────── */
+.mz-toaster {
+    position: fixed;
+    top: 80px;
+    left: 24px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 420px;
+    pointer-events: none;
+}
+.mz-toast {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    background: var(--card);
+    border: 1px solid var(--borderl);
+    border-radius: 10px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, .5);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--cream);
+    pointer-events: auto;
+    animation: mz-toast-in .25s ease-out;
+}
+.mz-toast-success {
+    border-right: 3px solid var(--green);
+}
+.mz-toast-success .mz-toast-icon {
+    color: var(--green);
+}
+.mz-toast-error {
+    border-right: 3px solid var(--red);
+}
+.mz-toast-error .mz-toast-icon {
+    color: var(--red);
+}
+.mz-toast-info {
+    border-right: 3px solid var(--blue);
+}
+.mz-toast-info .mz-toast-icon {
+    color: var(--blue);
+}
+.mz-toast-icon {
+    font-size: 16px;
+    font-weight: 900;
+    flex-shrink: 0;
+}
+.mz-toast-msg {
+    flex: 1;
+    line-height: 1.55;
+}
+.mz-toast-close {
+    background: transparent;
+    border: none;
+    color: var(--mute);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    transition: color .15s;
+}
+.mz-toast-close:hover {
+    color: var(--cream);
+}
+.mz-toast-enter {
+    animation: mz-toast-in .25s ease-out;
+}
+.mz-toast-leave {
+    animation: mz-toast-out .2s ease-in forwards;
+}
+@keyframes mz-toast-in {
+    from { opacity: 0; transform: translateX(-12px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+@keyframes mz-toast-out {
+    from { opacity: 1; transform: translateX(0); }
+    to { opacity: 0; transform: translateX(-12px); }
+}
+
+/* ───────────────────────────────────────────
+   EMPTY STATE — standard empty/no-results block
+─────────────────────────────────────────── */
+.mz-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 48px 24px;
+    text-align: center;
+    background: var(--card);
+    border: 1px dashed var(--borderl);
+    border-radius: 14px;
+    color: var(--dim);
+}
+.mz-empty-icon {
+    font-size: 44px;
+    line-height: 1;
+    opacity: .65;
+    margin-bottom: 4px;
+}
+.mz-empty-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--cream);
+}
+.mz-empty-msg {
+    font-size: 13px;
+    color: var(--mute);
+    line-height: 1.7;
+    max-width: 420px;
+    margin: 0;
+}
+.mz-empty-extra {
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--mute);
+}
+.mz-empty-action {
+    margin-top: 12px;
+}
+
+/* ───────────────────────────────────────────
+   PAGINATION — shared list-page pagination
+─────────────────────────────────────────── */
+.mz-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 16px 4px;
+    margin-top: 12px;
+    border-top: 1px solid var(--borderl);
+}
+.mz-pagination-info {
+    font-size: 12px;
+    color: var(--mute);
+}
+.mz-pagination-info strong {
+    color: var(--cream);
+    font-weight: 700;
+}
+.mz-pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.mz-page-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 34px;
+    height: 34px;
+    padding: 0 10px;
+    background: var(--card2);
+    border: 1px solid var(--borderl);
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--dim);
+    text-decoration: none;
+    transition: background .15s, color .15s, border-color .15s;
+}
+.mz-page-link:hover:not(.disabled):not(.active) {
+    background: var(--pop);
+    color: var(--cream);
+    border-color: var(--gl);
+}
+.mz-page-link.active {
+    background: var(--gold);
+    border-color: var(--gold);
+    color: var(--bg);
+    cursor: default;
+}
+.mz-page-link.disabled {
+    opacity: .35;
+    cursor: not-allowed;
+}
+
+/* ───────────────────────────────────────────
+   SOURCE QUOTE — verbatim text from a reviewed document
+   that a finding (risk / compliance issue / weak point)
+   refers to. Renders as a visually-distinct block-quote
+   so reviewers can locate the exact passage.
+─────────────────────────────────────────── */
+.mz-source-quote {
+    margin: 10px 0 4px;
+    padding: 10px 14px;
+    background: rgba(200, 169, 75, .05);
+    border-right: 3px solid var(--gold);
+    border-radius: 6px;
+    font-family: 'Amiri', serif;
+    font-size: 13px;
+    color: var(--cream);
+    line-height: 1.85;
+    white-space: pre-wrap;
+    position: relative;
+}
+.mz-source-quote::before {
+    content: "„";
+    position: absolute;
+    top: -4px;
+    right: 8px;
+    font-size: 28px;
+    color: var(--gold);
+    opacity: .5;
+    line-height: 1;
+}
+.mz-source-quote-label {
+    display: block;
+    font-family: 'Cairo', 'Tajawal', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    color: var(--gold);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    opacity: .8;
+}
+
+/* ───────────────────────────────────────────
+   CONTRACT-REVIEW / TENDER-REVIEW / MEMO SHOW
+   — hero, stats bar, numbered findings, filter chips
+─────────────────────────────────────────── */
+
+/* Count badge on tab label */
+.mz-tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    margin-right: 6px;
+    background: var(--gold);
+    color: var(--bg);
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+/* Executive summary hero */
+.mz-review-hero {
+    padding: 20px 22px;
+    margin-bottom: 20px;
+    background: linear-gradient(135deg, rgba(200,169,75,.08), rgba(200,169,75,.02));
+    border: 1px solid rgba(200,169,75,.2);
+    border-right: 4px solid var(--gold);
+    border-radius: 12px;
+}
+.mz-review-hero-rating {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+.mz-review-hero-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--gold);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+.mz-review-hero-value {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--cream);
+}
+.mz-review-hero-summary {
+    font-size: 14px;
+    color: var(--cream);
+    line-height: 1.95;
+    margin: 0 0 10px;
+}
+.mz-review-hero-notes {
+    font-size: 12.5px;
+    color: var(--dim);
+    line-height: 1.85;
+    margin: 0;
+    padding-top: 10px;
+    border-top: 1px dashed rgba(200,169,75,.2);
+}
+
+/* Severity stats — row of clickable counters that filter the findings list */
+.mz-sev-stats {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+.mz-sev-stat {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: var(--card2);
+    border: 1px solid var(--borderl);
+    border-radius: 10px;
+    font-family: inherit;
+    color: var(--dim);
+    cursor: pointer;
+    transition: all .15s;
+    min-width: 100px;
+}
+.mz-sev-stat:hover:not(:disabled):not(.active) {
+    background: var(--pop);
+    border-color: var(--sev-color, var(--gl));
+}
+.mz-sev-stat.active {
+    background: color-mix(in srgb, var(--sev-color) 14%, transparent);
+    border-color: var(--sev-color);
+    color: var(--cream);
+}
+.mz-sev-stat:disabled {
+    opacity: .35;
+    cursor: not-allowed;
+}
+.mz-sev-stat-icon {
+    font-size: 14px;
+    line-height: 1;
+}
+.mz-sev-stat-count {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--sev-color, var(--cream));
+    line-height: 1;
+}
+.mz-sev-stat-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--dim);
+}
+.mz-sev-stat.active .mz-sev-stat-label {
+    color: var(--cream);
+}
+
+/* Findings section container */
+.mz-findings-section {
+    margin-bottom: 24px;
+}
+.mz-findings-section-label {
+    padding-bottom: 10px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid var(--borderl);
+}
+
+/* Individual finding card — severity dot + anchor number + quote + action */
+.mz-finding-card {
+    position: relative;
+    padding: 16px 18px;
+    margin-bottom: 12px;
+    background: var(--card2);
+    border: 1px solid var(--borderl);
+    border-right: 4px solid var(--sev-color, var(--gold));
+    border-radius: 10px;
+    transition: border-color .15s;
+    scroll-margin-top: 80px;
+}
+.mz-finding-card:target {
+    border-color: var(--sev-color, var(--gold));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--sev-color) 30%, transparent);
+}
+.mz-finding-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+.mz-finding-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 34px;
+    height: 24px;
+    padding: 0 8px;
+    background: rgba(0,0,0,.25);
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--mute);
+    letter-spacing: .05em;
+}
+.mz-finding-sev {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    background: color-mix(in srgb, var(--sev-color) 14%, transparent);
+    color: var(--sev-color);
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 700;
+}
+.mz-finding-sev-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--sev-color);
+}
+.mz-finding-title {
+    flex: 1;
+    margin: 0;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--cream);
+    line-height: 1.55;
+}
+.mz-finding-body {
+    font-size: 13px;
+    color: var(--dim);
+    line-height: 1.8;
+    margin: 0 0 10px;
+}
+.mz-finding-action {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: rgba(200,169,75,.06);
+    border-right: 2px solid var(--gold);
+    border-radius: 6px;
+    font-size: 12.5px;
+    color: var(--cream);
+    line-height: 1.75;
+}
+.mz-finding-action-label {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--gold);
+    letter-spacing: .06em;
+    margin-bottom: 4px;
+}
+.mz-finding-meta {
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--mute);
+    line-height: 1.6;
+}
+
+/* Amendments — current vs suggested */
+.mz-amendment-card {
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    background: var(--card2);
+    border: 1px solid var(--borderl);
+    border-radius: 10px;
+}
+.mz-source-quote-strike {
+    color: #c77;
+}
+.mz-source-quote-strike::before {
+    color: #c77;
+}
+.mz-suggested-quote {
+    margin: 8px 0 4px;
+    padding: 10px 14px;
+    background: rgba(61,191,138,.06);
+    border-right: 3px solid #3dbf8a;
+    border-radius: 6px;
+    font-family: 'Amiri', serif;
+    font-size: 13px;
+    color: #bde5d0;
+    line-height: 1.85;
+    white-space: pre-wrap;
+}
+.mz-suggested-quote-label {
+    display: block;
+    font-family: 'Cairo', 'Tajawal', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    color: #3dbf8a;
+    letter-spacing: .06em;
+    margin-bottom: 6px;
+}
+
+/* Missing protections */
+.mz-protection-card {
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    background: var(--card2);
+    border: 1px solid var(--borderl);
+    border-right: 3px solid var(--gold);
+    border-radius: 10px;
+}
+.mz-protection-issue {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--cream);
+    line-height: 1.75;
+}
+
+/* Parties list */
+.mz-parties-list {
+    padding-right: 20px;
+    margin: 0;
+    color: var(--cream);
+    font-size: 13px;
+    line-height: 2;
+}
+
+/* ───────────────────────────────────────────
+   PASSWORD VISIBILITY TOGGLE (login form)
+─────────────────────────────────────────── */
+.mz-pwd-wrap {
+    position: relative;
+    display: block;
+}
+.mz-pwd-input {
+    padding-left: 40px !important;
+}
+[dir="rtl"] .mz-pwd-input {
+    padding-left: 12px !important;
+    padding-right: 40px !important;
+}
+.mz-pwd-toggle {
+    position: absolute;
+    top: 50%;
+    left: 8px;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    font-size: 15px;
+    cursor: pointer;
+    opacity: .55;
+    transition: opacity .15s, background .15s;
+}
+[dir="rtl"] .mz-pwd-toggle {
+    left: auto;
+    right: 8px;
+}
+.mz-pwd-toggle:hover {
+    opacity: 1;
+    background: rgba(200, 169, 75, .1);
+}
+.mz-pwd-toggle:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 1px;
+    opacity: 1;
+}
+
+/* ───────────────────────────────────────────
+   DROPDOWN / SELECT — custom chevron arrow
+   All native select in mz-inp class get the chevron treatment.
+─────────────────────────────────────────── */
+select.mz-inp,
+select.mz-select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    padding-left: 36px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23c8a94b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: left 12px center;
+    background-size: 14px;
+    cursor: pointer;
+    transition: border-color .15s, background-color .15s;
+}
+[dir="rtl"] select.mz-inp,
+[dir="rtl"] select.mz-select {
+    padding-left: 14px;
+    padding-right: 36px;
+    background-position: left 12px center;
+}
+select.mz-inp:hover,
+select.mz-select:hover {
+    border-color: var(--gl);
+}
+select.mz-inp:focus,
+select.mz-select:focus {
+    border-color: var(--gold);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23e4c96a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+select.mz-inp option,
+select.mz-select option {
+    background: var(--card);
+    color: var(--cream);
+}
+
+/* Custom dropdown trigger (button that opens a menu) — chevron indicator */
+.mz-dropdown-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: color .15s;
+}
+.mz-dropdown-trigger::after {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(45deg);
+    margin-top: -4px;
+    opacity: .6;
+    transition: transform .2s;
+}
+.mz-dropdown-trigger[aria-expanded="true"]::after,
+.mz-dropdown-trigger.open::after {
+    transform: rotate(-135deg);
+    margin-top: 2px;
+    opacity: 1;
+}
+
+/* ───────────────────────────────────────────
+   BUTTON ENHANCEMENTS — polished states
+─────────────────────────────────────────── */
+.mz-btn {
+    transition: background-color .18s, border-color .18s, transform .08s, box-shadow .18s;
+}
+.mz-btn:active:not(:disabled) {
+    transform: translateY(1px);
+}
+.mz-btn:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 2px;
+}
+.mz-btn-gold:hover:not(:disabled) {
+    box-shadow: 0 2px 10px rgba(200, 169, 75, .25);
+}
+.mz-btn-ghost:hover:not(:disabled) {
+    background: rgba(200, 169, 75, .08);
+    border-color: var(--gl);
+}
+.mz-btn[disabled],
+.mz-btn:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* ───────────────────────────────────────────
+   FORM LAYOUT — fill more width, less whitespace
+─────────────────────────────────────────── */
+.mz-form-page {
+    max-width: 100%;
+    padding: 0;
+}
+.mz-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px 20px;
+    margin-bottom: 16px;
+}
+.mz-form-grid-3 {
+    grid-template-columns: repeat(3, 1fr);
+}
+.mz-form-grid .mz-full {
+    grid-column: 1 / -1;
+}
+@media (max-width: 780px) {
+    .mz-form-grid,
+    .mz-form-grid-3 {
+        grid-template-columns: 1fr;
+    }
+}
+.mz-form-group {
+    margin-bottom: 14px;
+}
+.mz-form-group:last-child {
+    margin-bottom: 0;
+}
+.mz-inp,
+.mz-textarea {
+    width: 100%;
+    box-sizing: border-box;
+}
+.mz-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding-top: 18px;
+    margin-top: 20px;
+    border-top: 1px solid var(--borderl);
+}
+
+/* ───────────────────────────────────────────
+   DATATABLE-LITE — client-side sort + filter
+─────────────────────────────────────────── */
+.mz-datatable-wrap {
+    background: var(--card);
+    border: 1px solid var(--borderl);
+    border-radius: 12px;
+    overflow: hidden;
+}
+.mz-datatable-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--card2);
+    border-bottom: 1px solid var(--borderl);
+    flex-wrap: wrap;
+}
+.mz-datatable-search {
+    flex: 1;
+    min-width: 220px;
+    position: relative;
+}
+.mz-datatable-search input {
+    width: 100%;
+    padding: 8px 36px 8px 12px;
+    background: var(--card);
+    border: 1px solid var(--borderl);
+    border-radius: 8px;
+    color: var(--cream);
+    font-family: inherit;
+    font-size: 13px;
+    transition: border-color .15s;
+}
+.mz-datatable-search input:focus {
+    outline: none;
+    border-color: var(--gold);
+}
+.mz-datatable-search::before {
+    content: '🔍';
+    position: absolute;
+    top: 50%;
+    right: 12px;
+    transform: translateY(-50%);
+    font-size: 12px;
+    opacity: .5;
+    pointer-events: none;
+}
+.mz-datatable-info {
+    font-size: 11px;
+    color: var(--mute);
+}
+.mz-datatable {
+    width: 100%;
+    border-collapse: collapse;
+}
+.mz-datatable th {
+    padding: 12px 16px;
+    background: var(--card2);
+    border-bottom: 1px solid var(--borderl);
+    text-align: right;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--gold);
+    letter-spacing: .05em;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+.mz-datatable th.sortable:hover {
+    background: var(--pop);
+}
+.mz-datatable th .mz-sort-arrow {
+    display: inline-block;
+    margin-right: 4px;
+    opacity: .35;
+    transition: opacity .15s;
+    font-size: 10px;
+}
+.mz-datatable th.sort-asc .mz-sort-arrow,
+.mz-datatable th.sort-desc .mz-sort-arrow {
+    opacity: 1;
+    color: var(--gold);
+}
+.mz-datatable td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--borderl);
+    font-size: 13px;
+    color: var(--cream);
+    vertical-align: middle;
+}
+.mz-datatable tr:last-child td {
+    border-bottom: none;
+}
+.mz-datatable tr:hover td {
+    background: rgba(200, 169, 75, .03);
+}
+.mz-datatable-empty {
+    padding: 48px 24px;
+    text-align: center;
+    color: var(--mute);
+    font-size: 13px;
+}
+
+/* ───────────────────────────────────────────
+   DASHBOARD STAT CARDS — colored accent widgets
+─────────────────────────────────────────── */
+.mz-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+    margin-bottom: 20px;
+}
+.mz-stat-card {
+    position: relative;
+    padding: 18px 20px;
+    background: var(--card);
+    border: 1px solid var(--borderl);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: transform .2s, box-shadow .2s, border-color .2s;
+}
+.mz-stat-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent, var(--gold));
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .3);
+}
+.mz-stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--accent, var(--gold));
+}
+.mz-stat-icon {
+    font-size: 24px;
+    margin-bottom: 6px;
+    opacity: .8;
+}
+.mz-stat-value {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--cream);
+    line-height: 1.1;
+    margin-bottom: 4px;
+}
+.mz-stat-label {
+    font-size: 12px;
+    color: var(--mute);
+    letter-spacing: .03em;
+}
+.mz-stat-trend {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    font-size: 11px;
+    padding: 3px 8px;
+    background: rgba(61, 191, 138, .1);
+    color: #3dbf8a;
+    border-radius: 6px;
+    font-weight: 700;
+}
+
+/* ───────────────────────────────────────────
+   GUEST LAYOUT (login / password reset)
+─────────────────────────────────────────── */
+.mz-guest-body {
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(ellipse at top, #0f1823 0%, var(--bg) 55%);
+    color: var(--cream);
+    font-family: 'Cairo', 'Tajawal', sans-serif;
+}
+.mz-guest-shell {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    gap: 18px;
+}
+.mz-guest-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 4px;
+}
+.mz-guest-mark {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--gold), #8d6f20);
+    display: grid;
+    place-items: center;
+    font-size: 26px;
+    box-shadow: 0 6px 20px rgba(200,169,75,.25);
+}
+.mz-guest-name {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--cream);
+    letter-spacing: .02em;
+}
+.mz-guest-tag {
+    font-size: 11px;
+    color: var(--gold);
+    letter-spacing: .12em;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+.mz-guest-card {
+    width: 100%;
+    max-width: 440px;
+    background: var(--card);
+    border: 1px solid var(--borderl);
+    border-radius: 16px;
+    padding: 32px 30px;
+    box-shadow: 0 10px 40px rgba(0,0,0,.4);
+}
+.mz-guest-title {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--cream);
+    margin: 0 0 6px;
+}
+.mz-guest-sub {
+    font-size: 13px;
+    color: var(--mute);
+    margin: 0 0 22px;
+}
+.mz-guest-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.mz-guest-options {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 12.5px;
+    margin-top: 4px;
+}
+.mz-guest-remember {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--dim);
+    cursor: pointer;
+}
+.mz-guest-remember input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--gold);
+}
+.mz-guest-forgot {
+    color: var(--gold);
+    text-decoration: none;
+    font-weight: 600;
+    transition: color .15s;
+}
+.mz-guest-forgot:hover {
+    color: var(--gh);
+    text-decoration: underline;
+}
+.mz-guest-submit {
+    width: 100%;
+    justify-content: center;
+    margin-top: 8px;
+    padding: 12px;
+    font-size: 14px;
+    font-weight: 700;
+}
+.mz-guest-status {
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    background: rgba(61,191,138,.1);
+    border: 1px solid rgba(61,191,138,.3);
+    border-radius: 8px;
+    color: #3dbf8a;
+    font-size: 13px;
+}
+.mz-guest-footer {
+    font-size: 11px;
+    color: var(--mute);
+    margin-top: 20px;
+    letter-spacing: .05em;
+}
+.mz-form-error {
+    color: #e55;
+    font-size: 12px;
+    margin-top: 4px;
+}
+
+/* ───────────────────────────────────────────
+   MOBILE SIDEBAR (hamburger + drawer)
+─────────────────────────────────────────── */
+.mz-mobile-toggle {
+    display: none;
+    position: fixed;
+    top: 14px;
+    right: 14px;
+    z-index: 50;
+    width: 40px;
+    height: 40px;
+    background: var(--card);
+    border: 1px solid var(--borderl);
+    border-radius: 10px;
+    color: var(--cream);
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,.3);
+    transition: background .15s;
+}
+.mz-mobile-toggle:hover {
+    background: var(--card2);
+}
+.mz-sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.5);
+    z-index: 40;
+}
+
+@media (max-width: 900px) {
+    .mz-mobile-toggle { display: grid; place-items: center; }
+    .mz-sidebar-backdrop { display: block; }
+
+    .mz-sidebar {
+        position: fixed;
+        top: 0;
+        right: 0;
+        height: 100vh;
+        z-index: 45;
+        transform: translateX(100%);
+        transition: transform .25s ease-out;
+        box-shadow: -8px 0 24px rgba(0,0,0,.5);
+    }
+    .mz-sidebar.mz-sidebar-open {
+        transform: translateX(0);
+    }
+
+    .mz-main {
+        padding-top: 64px;
+    }
+    .mz-topbar {
+        padding-right: 64px;
+    }
+}
+
+/* ───────────────────────────────────────────
+   BACK-BUTTON ARROW DIRECTION (RTL-aware)
+   Any element marked .mz-back-arrow with a text arrow "←" gets flipped
+   in RTL so "back" points to the right as Arabic readers expect.
+─────────────────────────────────────────── */
+[dir="rtl"] .mz-back-arrow {
+    display: inline-block;
+    transform: scaleX(-1);
+}
+
+/* ───────────────────────────────────────────
+   NOTIFICATION BADGE polish (#23)
+─────────────────────────────────────────── */
+.mz-notif-badge {
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    background: #e55;
+    color: #fff;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 16px;
+    text-align: center;
+    border: 2px solid var(--surf);
+    box-sizing: content-box;
+}
+[dir="rtl"] .mz-notif-badge {
+    right: auto;
+    left: -3px;
 }

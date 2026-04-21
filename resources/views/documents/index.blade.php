@@ -1,3 +1,5 @@
+@section('title', 'المستندات القانونية')
+
 <x-app-layout>
     <div class="mz-screen">
         <div class="mz-page-head">
@@ -51,15 +53,15 @@
                     </div>
                 </a>
             @empty
-                <div class="mz-card" style="padding:48px;text-align:center;color:var(--mute)">
-                    <div style="font-size:40px;margin-bottom:12px">📭</div>
-                    <div style="font-size:14px">لا توجد مستندات</div>
-                </div>
+                <x-empty-state
+                    icon="📭"
+                    title="لا توجد مستندات"
+                    message="ابدأ برفع أول مستند قانوني للجهة."
+                    :action="auth()->user()->can('documents.create') ? route('documents.create') : null"
+                    :actionLabel="auth()->user()->can('documents.create') ? '+ رفع مستند' : null" />
             @endforelse
         </div>
 
-        @if ($documents->hasPages())
-            <div style="margin-top:8px">{{ $documents->withQueryString()->links() }}</div>
-        @endif
+        <x-pagination :paginator="$documents" />
     </div>
 </x-app-layout>

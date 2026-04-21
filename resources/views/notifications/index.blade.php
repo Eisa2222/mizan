@@ -1,3 +1,5 @@
+@section('title', 'الإشعارات')
+
 <x-app-layout>
     <div class="mz-screen">
         <div class="mz-page-head">
@@ -48,15 +50,10 @@
                     </button>
                 </form>
             @empty
-                <div style="padding:64px;text-align:center;color:var(--mute)">
-                    <div style="font-size:48px;margin-bottom:12px">🔔</div>
-                    <div style="font-size:14px">لا توجد إشعارات</div>
-                </div>
+                <x-empty-state icon="🔔" title="لا توجد إشعارات" />
             @endforelse
         </div>
 
-        @if ($notifications->hasPages())
-            <div>{{ $notifications->links() }}</div>
-        @endif
+        <x-pagination :paginator="$notifications" />
     </div>
 </x-app-layout>

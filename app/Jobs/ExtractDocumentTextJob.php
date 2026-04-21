@@ -55,19 +55,25 @@ class ExtractDocumentTextJob implements ShouldQueue
 
         $absolutePath = Storage::disk('public')->path($document->file_path);
         if (! is_file($absolutePath)) {
-            $this->markFailed($document, 'الملف غير موجود على القرص.');
+            $this->markFailed(
+                $document,
+                userMessage: 'تعذّر استخراج النص من هذا المستند. يُرجى إعادة رفع الملف.',
+                technicalReason: 'الملف غير موجود على القرص: ' . $document->file_path,
+            );
             return;
         }
 
         $status = $ocr->status();
         if ($status !== OcrService::STATUS_READY) {
-            $this->markFailed($document, match ($status) {
+            $userMsg = 'تعذّر استخراج النص من هذا المستند — فريقنا التقني تم إبلاغه وسيُعالج الأمر قريباً.';
+            $techReason = match ($status) {
                 OcrService::STATUS_MISSING_TESSERACT =>
-                    'Tesseract غير منصّب على الخادم. ثبّت tesseract-ocr مع حزمة اللغة العربية (tesseract-ocr-ara) ثم أعد رفع الملف.',
+                    'Tesseract not installed. Install tesseract-ocr + tesseract-ocr-ara language pack.',
                 OcrService::STATUS_MISSING_PDFTOPPM  =>
-                    'أداة pdftoppm (Poppler) غير منصّبة على الخادم. ثبّت Poppler ثم أعد رفع الملف.',
-                default => 'بيئة OCR غير جاهزة على الخادم.',
-            });
+                    'pdftoppm (Poppler) not installed. Install poppler-utils.',
+                default => 'OCR environment not ready.',
+            };
+            $this->markFailed($document, userMessage: $userMsg, technicalReason: $techReason);
             return;
         }
 
@@ -76,7 +82,11 @@ class ExtractDocumentTextJob implements ShouldQueue
         $isPdf = $ext === 'pdf';
 
         if (! $isImage && ! $isPdf) {
-            $this->markFailed($document, 'نوع الملف غير مدعوم لـ OCR.');
+            $this->markFailed(
+                $document,
+                userMessage: 'نوع الملف غير مدعوم لاستخراج النص. الصيغ المدعومة: PDF والصور.',
+                technicalReason: 'Unsupported file type for OCR: ' . $ext,
+            );
             return;
         }
 
@@ -84,7 +94,11 @@ class ExtractDocumentTextJob implements ShouldQueue
             $text = $isImage ? $ocr->ocrImage($absolutePath) : $ocr->ocrPdf($absolutePath);
 
             if ($text === null || trim($text) === '') {
-                $this->markFailed($document, 'لم يتمكن OCR من استخراج أي نص من الملف. قد تكون جودة الصورة منخفضة جداً.');
+                $this->markFailed(
+                    $document,
+                    userMessage: 'تعذّر استخراج النص من هذا الملف — قد تكون جودة المستند منخفضة أو لا يحتوي على نص قابل للقراءة.',
+                    technicalReason: 'OCR returned empty text.',
+                );
                 return;
             }
 
@@ -110,24 +124,42 @@ class ExtractDocumentTextJob implements ShouldQueue
                 'document_id' => $document->id,
                 'error' => $e->getMessage(),
             ]);
-            $this->markFailed($document, 'خطأ أثناء معالجة OCR: ' . $e->getMessage());
+            $this->markFailed(
+                $document,
+                userMessage: 'حدث خطأ غير متوقّع أثناء معالجة المستند — فريقنا التقني تم إبلاغه.',
+                technicalReason: 'OCR exception: ' . $e->getMessage(),
+            );
         }
     }
 
-    private function markFailed(LegalDocument $document, string $reason): void
+    /**
+     * Split user-facing message from internal technical reason.
+     *
+     * The notification body (visible to the uploader) uses the friendly
+     * Arabic message. The raw technical reason is written to the logs and
+     * to `metadata.extraction_error_technical` for admins, but never
+     * shown to end users (audit #24).
+     */
+    private function markFailed(LegalDocument $document, string $userMessage, string $technicalReason): void
     {
         $meta = $document->metadata ?? [];
         $meta['extraction_status'] = 'failed';
-        $meta['extraction_error'] = $reason;
+        $meta['extraction_error'] = $userMessage;
+        $meta['extraction_error_technical'] = $technicalReason;
         $meta['failed_at'] = now()->toIso8601String();
         $document->metadata = $meta;
         $document->save();
+
+        Log::warning('Document text extraction failed', [
+            'document_id' => $document->id,
+            'reason' => $technicalReason,
+        ]);
 
         AppNotification::notify(
             userId: $document->uploaded_by,
             type: 'ocr_failed',
             title: 'فشل استخراج محتوى المستند',
-            body: $reason,
+            body: $userMessage,
             data: ['document_id' => $document->id]
         );
     }
