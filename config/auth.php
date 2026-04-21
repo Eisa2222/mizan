@@ -42,6 +42,15 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+
+        // Dedicated guard for SaaS operators (manages tenants, plans,
+        // coupons, landing CMS, reports). Lives entirely in central DB
+        // and NEVER mingles with tenant `web` sessions — different cookie,
+        // different provider, different tables.
+        'super_admin' => [
+            'driver' => 'session',
+            'provider' => 'super_admins',
+        ],
     ],
 
     /*
@@ -67,10 +76,10 @@ return [
             'model' => env('AUTH_MODEL', User::class),
         ],
 
-        // 'users' => [
-        //     'driver' => 'database',
-        //     'table' => 'users',
-        // ],
+        'super_admins' => [
+            'driver' => 'eloquent',
+            'model' => \App\Models\SuperAdmin::class,
+        ],
     ],
 
     /*
@@ -96,6 +105,24 @@ return [
         'users' => [
             'provider' => 'users',
             'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
+            'expire' => 60,
+            'throttle' => 60,
+        ],
+
+        // Broker used for the initial tenant-admin password setup link sent
+        // from TenantWelcomeMail. Lives in tenant DB (Phase 3 adds the
+        // matching password_reset_tokens migration under
+        // database/migrations/tenant/).
+        'tenants' => [
+            'provider' => 'users',
+            'table' => 'password_reset_tokens',
+            'expire' => 60 * 48, // 48 hours — matches the welcome email signed URL
+            'throttle' => 60,
+        ],
+
+        'super_admins' => [
+            'provider' => 'super_admins',
+            'table' => 'super_admin_password_reset_tokens',
             'expire' => 60,
             'throttle' => 60,
         ],
