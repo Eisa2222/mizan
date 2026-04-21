@@ -47,6 +47,11 @@ class LegalDocumentPolicy
 
     public function view(User $user, LegalDocument $doc): bool
     {
+        // SuperAdmin manages all organisations — including the shared
+        // "المكتبة المرجعية" (org 3) that holds imported laws/rulings any
+        // org user needs to read.
+        if ($user->hasAtLeastRole(UserRole::SuperAdmin)) return true;
+
         if (!$this->sameOrg($user, $doc)) return false;
         if (!$user->hasAtLeastRole(UserRole::ReadOnly)) return false;
 
