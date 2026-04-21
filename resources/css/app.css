@@ -44,7 +44,7 @@
 
 html, body {
     height: 100%;
-    font-family: 'Tajawal', sans-serif;
+    font-family: 'Cairo', 'Tajawal', sans-serif;
     background: var(--bg);
     color: var(--cream);
     direction: rtl;
@@ -118,7 +118,7 @@ body { overflow: hidden; }
 .mz-tb-search svg { color: var(--mute); flex-shrink: 0; }
 .mz-tb-search input {
     flex: 1; background: transparent; border: none; outline: none;
-    color: var(--cream); font-family: 'Tajawal', sans-serif; font-size: 13px; direction: rtl;
+    color: var(--cream); font-family: 'Cairo', 'Tajawal', sans-serif; font-size: 13px; direction: rtl;
 }
 .mz-tb-search input::placeholder { color: var(--mute); }
 
@@ -295,7 +295,7 @@ body { overflow: hidden; }
     display: inline-flex; align-items: center; gap: 7px;
     padding: 9px 18px;
     border-radius: 8px;
-    font-family: 'Tajawal', sans-serif;
+    font-family: 'Cairo', 'Tajawal', sans-serif;
     font-size: 13px; font-weight: 700;
     cursor: pointer; border: none;
     transition: all .2s;
@@ -326,7 +326,7 @@ body { overflow: hidden; }
     border-radius: 8px;
     padding: 9px 13px;
     color: var(--cream);
-    font-family: 'Tajawal', sans-serif;
+    font-family: 'Cairo', 'Tajawal', sans-serif;
     font-size: 13px;
     direction: rtl;
     width: 100%;
@@ -798,7 +798,7 @@ body { overflow: hidden; }
     border: none;
     outline: none;
     color: var(--cream);
-    font-family: 'Tajawal', sans-serif;
+    font-family: 'Cairo', 'Tajawal', sans-serif;
     font-size: 15px;
     direction: rtl;
 }
@@ -1175,7 +1175,7 @@ body { overflow: hidden; }
 }
 .mz-source-quote-label {
     display: block;
-    font-family: 'Tajawal', sans-serif;
+    font-family: 'Cairo', 'Tajawal', sans-serif;
     font-size: 10px;
     font-weight: 700;
     letter-spacing: .06em;
@@ -1432,7 +1432,7 @@ body { overflow: hidden; }
 }
 .mz-suggested-quote-label {
     display: block;
-    font-family: 'Tajawal', sans-serif;
+    font-family: 'Cairo', 'Tajawal', sans-serif;
     font-size: 10px;
     font-weight: 700;
     color: #3dbf8a;
@@ -1819,7 +1819,7 @@ select.mz-select option {
     min-height: 100vh;
     background: radial-gradient(ellipse at top, #0f1823 0%, var(--bg) 55%);
     color: var(--cream);
-    font-family: 'Tajawal', sans-serif;
+    font-family: 'Cairo', 'Tajawal', sans-serif;
 }
 .mz-guest-shell {
     min-height: 100vh;

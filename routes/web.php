@@ -109,6 +109,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/documents/create', [DocumentController::class, 'create'])->name('documents.create');
     Route::post('/documents', [DocumentController::class, 'store'])->name('documents.store');
     Route::get('/documents/{document}', [DocumentController::class, 'show'])->name('documents.show');
+    Route::get('/documents/{document}/read', [DocumentController::class, 'read'])->name('documents.read');
     Route::patch('/documents/{document}/content', [DocumentController::class, 'updateContent'])->name('documents.updateContent');
     Route::delete('/documents/{document}', [DocumentController::class, 'destroy'])->name('documents.destroy');
 

@@ -85,6 +85,7 @@
                 @endif
             </div>
             <div style="display:flex;gap:8px">
+                <a href="{{ route('documents.read', $document) }}" class="mz-btn mz-btn-gold mz-btn-sm" title="عرض مخصّص للقراءة بنمط المواد (خط Cairo + تخطيط مشابه لبوابة هيئة الخبراء)">📖 عرض القراءة</a>
                 <form method="POST" action="{{ route('watchlist.toggle', $document) }}">
                     @csrf
                     <button type="submit" class="mz-btn mz-btn-ghost mz-btn-sm">

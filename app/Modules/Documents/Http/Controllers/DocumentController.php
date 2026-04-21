@@ -21,6 +21,7 @@ use Modules\Documents\Http\Resources\DocumentAutocompleteResource;
 use Modules\Documents\Queries\AutocompleteDocumentsQuery;
 use Modules\Documents\Queries\DocumentShowContextQuery;
 use Modules\Documents\Queries\DocumentsForUserQuery;
+use Modules\Documents\Support\ArticleParser;
 
 class DocumentController extends Controller
 {
@@ -86,6 +87,24 @@ class DocumentController extends Controller
             'isWatching'  => $context['is_watching'],
             'annotations' => $context['annotations'],
             'discussions' => $context['discussions'],
+        ]);
+    }
+
+    /**
+     * Reader view — clean article-by-article layout inspired by the Saudi
+     * Bureau of Experts law portal (laws.boe.gov.sa). Parses "المادة N"
+     * markers into discrete sections and renders with Cairo font.
+     */
+    public function read(LegalDocument $document): View
+    {
+        $this->authorize('view', $document);
+
+        $parsed = ArticleParser::parse($document->content);
+
+        return view('documents.read', [
+            'document' => $document,
+            'preamble' => $parsed['preamble'],
+            'articles' => $parsed['articles'],
         ]);
     }
 
