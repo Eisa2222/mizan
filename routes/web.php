@@ -231,6 +231,11 @@ Route::prefix('super-admin')->name('super-admin.')->group(function () {
 
         Route::get('/', SuperAdminDashboardController::class)->name('dashboard');
 
+        // Profile self-service
+        Route::get('/profile',            [\Modules\SuperAdmin\Http\Controllers\ProfileController::class, 'edit'])->name('profile.edit');
+        Route::patch('/profile',          [\Modules\SuperAdmin\Http\Controllers\ProfileController::class, 'update'])->name('profile.update');
+        Route::patch('/profile/password', [\Modules\SuperAdmin\Http\Controllers\ProfileController::class, 'updatePassword'])->name('profile.password');
+
         // Tenants
         Route::get('/tenants',                          [SuperAdminTenantController::class, 'index'])->name('tenants.index');
         Route::get('/tenants/{tenant}',                 [SuperAdminTenantController::class, 'show'])->name('tenants.show');

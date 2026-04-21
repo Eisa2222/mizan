@@ -107,7 +107,9 @@
             <div class="sa-topbar">
                 <h1 class="sa-page-title">@yield('heading', 'لوحة المدير العام')</h1>
                 <div class="sa-topbar-actions">
-                    <span class="sa-user-chip">👤 {{ auth('super_admin')->user()?->name }}</span>
+                    <a href="{{ route('super-admin.profile.edit') }}" class="sa-user-chip" style="text-decoration:none;color:inherit">
+                        👤 {{ auth('super_admin')->user()?->name }}
+                    </a>
                     <form method="POST" action="{{ route('super-admin.logout') }}" style="display:inline">
                         @csrf
                         <button type="submit" class="sa-btn sa-btn-ghost">تسجيل خروج</button>

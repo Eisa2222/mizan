@@ -46,6 +46,12 @@ Route::middleware([
         ->name('tenant.password.setup');
     Route::post('/password/setup', [\App\Http\Controllers\TenantPasswordSetupController::class, 'store'])
         ->name('tenant.password.setup.store');
+
+    // Billing dashboard — must remain reachable on suspended/expired
+    // tenants so owners can see their status and hop to the central
+    // Checkout to renew.
+    Route::get('/billing',                   [\App\Http\Controllers\TenantBillingController::class, 'index'])->name('tenant.billing');
+    Route::post('/billing/renew/{plan}',     [\App\Http\Controllers\TenantBillingController::class, 'renew'])->name('tenant.billing.renew');
 });
 
 // Tenant routes gated by active subscription. Phase 4 ships the
