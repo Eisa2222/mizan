@@ -1,6 +1,8 @@
 # دليل التثبيت — الإنتاج (Production)
 
 > تشغيل منصة ميزان على خادم Linux مع دومين حقيقي + HTTPS.
+>
+> **نموذج SaaS متعدّد المستأجرين:** دومين مركزي (مثل `mizaan.sa`) يستضيف صفحة الهبوط + Checkout + SuperAdmin، وكل مستأجر يحصل على subdomain خاص (`acme.mizaan.sa`) بقاعدة بيانات مستقلة.
 
 ---
 
@@ -236,3 +238,156 @@ ollama pull gemma3:9b
 - [ ] اعمل backups دورية لقاعدة البيانات (`mysqldump` في cron)
 - [ ] راقب Sentry/Grafana لتتبع الأخطاء
 - [ ] راجع `php artisan route:list` بشكل دوري للتأكد من عدم تسريب endpoints
+
+---
+
+## 8. إعداد SaaS (بعد تثبيت القاعدة)
+
+بعد أن ينتهي `install.sh`، تُشغَّل هذه الخطوات لتفعيل منصّة SaaS الكاملة:
+
+### 8.1 Wildcard DNS للـ subdomains
+
+كل مستأجر يحصل على subdomain مستقل (`acme.mizaan.sa`، `beta.mizaan.sa`، ...). في إعدادات DNS:
+
+```
+Type   Name   Value
+A      *      <IP الخادم>
+A      @      <IP الخادم>
+```
+
+### 8.2 Wildcard SSL
+
+```bash
+# استخدم DNS-01 challenge (أسهل مع wildcard)
+sudo certbot certonly --manual --preferred-challenges=dns \
+    -d "mizaan.sa" -d "*.mizaan.sa"
+```
+
+حدِّث `deploy/nginx.conf.template` ليستخدم شهادة wildcard، ثم:
+
+```bash
+sudo cp deploy/nginx.conf.template /etc/nginx/sites-available/mizan
+sudo sed -i 's/__DOMAIN__/mizaan.sa/g' /etc/nginx/sites-available/mizan
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+### 8.3 تعيين central domains
+
+في `.env`:
+
+```ini
+CENTRAL_DOMAINS=mizaan.sa,www.mizaan.sa
+```
+
+أي طلب لأي subdomain آخر سيُعامل كـ tenant تلقائياً.
+
+### 8.4 seeder البيانات الأولية
+
+```bash
+php artisan db:seed --class=SaasInitialSeeder
+```
+
+يُنشئ تلقائياً:
+- 3 باقات (الأساسية 299 / الاحترافية 899 / المؤسسية 2,999)
+- 6 مميزات لصفحة الهبوط
+- 6 أسئلة شائعة
+- إعدادات افتراضية (trial 14 يوم، hero copy، mail=log)
+- حساب SuperAdmin (`sa@mizaan.local` / `Admin@123`) — **غيّره فوراً**
+
+### 8.5 إعدادات Moyasar من لوحة SuperAdmin
+
+```
+https://mizaan.sa/super-admin/login
+```
+
+اذهب إلى **الإعدادات > Moyasar** وعبّئ:
+- `moyasar_publishable_key` (pk_live_...)
+- `moyasar_secret_key` (sk_live_...) — يُحفظ مشفّراً
+- `moyasar_webhook_secret`
+- فعّل `moyasar_test_mode=false` للإنتاج
+
+اضغط "اختبار الاتصال" للتحقق من صحة المفاتيح.
+
+### 8.6 تسجيل Webhook في Moyasar Dashboard
+
+في [dashboard.moyasar.com](https://dashboard.moyasar.com):
+- Webhooks → New
+- URL: `https://mizaan.sa/webhooks/moyasar`
+- Events: `payment_paid`, `payment_failed`, `payment_refunded`
+- Secret: نفس `moyasar_webhook_secret` الذي حفظته
+
+### 8.7 تحويل المؤسسات الحالية (إن وُجدت)
+
+إذا ترقّيت من نسخة single-tenant قديمة:
+
+```bash
+# معاينة
+php artisan saas:convert-org-to-tenant 1 --plan=pro --cycle=yearly --dry-run
+
+# تنفيذ
+php artisan saas:convert-org-to-tenant 1 --plan=pro --cycle=yearly
+```
+
+### 8.8 Queue worker + Scheduler (مُعدّان تلقائياً بواسطة `install.sh`)
+
+```bash
+systemctl status mizan-queue       # queue worker (CreateTenantJob، mail، OCR)
+crontab -l                         # cron entry: schedule:run كل دقيقة
+```
+
+تحقّق من تشغيل المهام اليومية:
+
+```bash
+php artisan schedule:list
+# يجب أن يظهر:
+#   0 0 * * * saas:check-trial-expiry
+#   0 8 * * * saas:send-trial-warnings
+```
+
+### 8.9 اختبار التدفّق الكامل
+
+1. زُر `https://mizaan.sa` — يجب رؤية الصفحة الرئيسية مع الباقات
+2. اختر باقة + اضغط "ابدأ الآن"
+3. عبّئ بيانات الشركة + اختبر الدفع ببطاقة Moyasar الاختبارية:
+   ```
+   4111 1111 1111 1111    exp: 01/39    cvc: 123
+   ```
+4. تحقّق من الوصول إلى `/checkout/success`
+5. تحقّق من استلام بريد الترحيب (أو راجع `storage/logs/laravel.log` لو `mail_driver=log`)
+6. اضغط رابط تهيئة كلمة المرور في البريد
+7. يجب أن يفتح subdomain المستأجر + يسجّل دخولك
+
+### 8.10 Runbook الصيانة اليومية
+
+| المهمة | الأمر |
+|-------|------|
+| تحقّق من queue | `systemctl status mizan-queue` |
+| logs الـ queue | `journalctl -u mizan-queue -f` |
+| logs التطبيق | `tail -f /var/www/mizan/storage/logs/laravel.log` |
+| logs المدفوعات (Moyasar) | `grep moyasar /var/www/mizan/storage/logs/laravel.log` |
+| فشل webhook | راجع `/super-admin/payments` + لوحة Moyasar |
+| تمديد يدوي لمستأجر | `/super-admin/tenants/{id}` → زر "تمديد" |
+
+---
+
+## 9. مرجع بنية SaaS
+
+```
+CENTRAL DB (mizaan_central)           TENANT DB (tenant_<uuid>)
+─────────────────────────             ─────────────────────────
+tenants + domains                     users + password_reset_tokens
+super_admins                          legal_documents + chunks + versions
+plans + plan_features                 tasks + comments + assignments
+subscriptions, payments               folders + members + documents
+coupons + coupon_uses                 tenders + sections + clauses + reviews
+landing_features + faqs               annotations + discussions + replies
+system_settings                       watchlists, article_updates
+gpc_knowledge        ← shared         document_relations
+distilled_knowledge  ← shared         ai_conversations + ai_messages
+                                      app_notifications
+                                      spatie permission tables
+                                      organizations (1 row per tenant)
+```
+
+كل tenant DB معزول فيزيائياً — لا يمكن للاستعلام عبر tenant context الوصول لأي tenant آخر.
+

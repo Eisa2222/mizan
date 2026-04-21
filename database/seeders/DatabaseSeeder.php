@@ -33,6 +33,18 @@ class DatabaseSeeder extends Seeder
         $this->call([
             GpcKnowledgeSeeder::class,
             DistilledKnowledgeSeeder::class,
+            SaasInitialSeeder::class,
         ]);
+
+        // Seed a default SuperAdmin for SaaS ops. Password is the same
+        // default as the legacy admin; change immediately after install.
+        \App\Models\SuperAdmin::firstOrCreate(
+            ['email' => 'sa@mizaan.local'],
+            [
+                'name'      => 'مدير SaaS',
+                'password'  => Hash::make('Admin@123'),
+                'is_active' => true,
+            ]
+        );
     }
 }
