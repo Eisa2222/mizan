@@ -19,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'super-admin'           => \Modules\Admin\Http\Middleware\EnsureSuperAdmin::class,
             'super-admin.auth'      => \App\Http\Middleware\EnsureSuperAdminAuthenticated::class,
             'apply-system-settings' => \App\Http\Middleware\ApplySystemSettings::class,
+            'subscription.active'   => \App\Http\Middleware\CheckSubscription::class,
         ]);
 
         // Moyasar posts webhook events with their own signature scheme,

@@ -14,17 +14,21 @@ use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 | Loaded by TenancyServiceProvider::mapRoutes(). Any request to a host
 | NOT listed in config('tenancy.central_domains') is resolved here.
 |
-| Phase 1 ships a placeholder root route so /tenancy tests succeed. Phases
-| 2-4 will gradually migrate the existing app routes here (documents,
-| tenders, dashboard, ...) and wrap them with the 'subscription.active'
-| middleware once CheckSubscription is introduced in Phase 4.
-|
+| Two middleware layers:
+|   - Tenancy stack (InitializeTenancy + PreventAccessFromCentralDomains
+|     + ApplySystemSettings) runs on EVERY tenant request.
+|   - subscription.active gates all routes except login/impersonate/
+|     password-setup — those must remain reachable on a suspended tenant
+|     so the owner can log in to renew.
 */
 
+// Tenant routes that SHOULD reach even suspended tenants (login, billing
+// actions, impersonation redemption) — no subscription gate.
 Route::middleware([
     'web',
     InitializeTenancyByDomainOrSubdomain::class,
     PreventAccessFromCentralDomains::class,
+    'apply-system-settings',
 ])->group(function () {
 
     // Impersonation redemption — SuperAdmin generates a token centrally,
@@ -35,14 +39,27 @@ Route::middleware([
     })->name('impersonate');
 
     // Tenant password setup — new admins land here from TenantWelcomeMail
-    // with a 48-hour signed URL. The password write hits the tenant DB,
-    // not central, because this route is inside the tenancy group.
+    // with a 48-hour signed URL. Lives inside tenant context so the
+    // password write hits the tenant DB, not central.
     Route::get('/password/setup/{token}', [\App\Http\Controllers\TenantPasswordSetupController::class, 'show'])
         ->middleware('signed')
         ->name('tenant.password.setup');
     Route::post('/password/setup', [\App\Http\Controllers\TenantPasswordSetupController::class, 'store'])
         ->name('tenant.password.setup.store');
+});
 
-    // Phase 4 will mount the real tenant app here (dashboard, documents,
-    // tasks, tenders, etc.) — moved from routes/web.php.
+// Tenant routes gated by active subscription. Phase 4 ships the
+// middleware + plumbing; actual app routes (documents, tasks, tenders,
+// dashboard…) get moved here in the cutover release once existing orgs
+// have been converted via `saas:convert-org-to-tenant`.
+Route::middleware([
+    'web',
+    InitializeTenancyByDomainOrSubdomain::class,
+    PreventAccessFromCentralDomains::class,
+    'apply-system-settings',
+    'subscription.active',
+])->group(function () {
+    // Placeholder — the real tenant app routes move here during cutover.
+    // The /app redirect inside web.php keeps legacy users funneled to
+    // /dashboard on their tenant subdomain once migrated.
 });
