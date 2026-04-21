@@ -2,6 +2,10 @@
 
 > خطوات تشغيل المنصة من الصفر حتى أول login — Windows / Linux / macOS.
 
+> **🚀 للإنتاج مع دومين خاص:** استخدم [deploy/INSTALL-PROD.md](deploy/INSTALL-PROD.md) — مثبّت آلي بخطوة واحدة يتولّى Nginx + HTTPS + queue worker + SSL.
+
+> هذا الدليل للتطوير المحلي فقط.
+
 ---
 
 ## 0. التحقق من المتطلبات
