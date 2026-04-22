@@ -5,6 +5,7 @@ namespace Modules\SuperAdmin\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Coupon;
 use App\Models\Plan;
+use App\Services\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -57,6 +58,10 @@ class CouponController extends Controller
 
         $coupon = Coupon::create($data);
 
+        AuditLogger::record('coupon.create', $coupon,
+            after: ['code' => $coupon->code, 'type' => $coupon->type, 'value' => $coupon->value],
+        );
+
         return redirect()
             ->route('super-admin.coupons.index')
             ->with('success', "تم إنشاء الكوبون «{$coupon->code}».");
@@ -86,7 +91,12 @@ class CouponController extends Controller
         $data = $this->validated($request, $coupon);
         unset($data['code']);
 
+        $original = $coupon->replicate();
         $coupon->update($data);
+
+        [$before, $after] = AuditLogger::diff($original, $coupon,
+            ['value', 'max_uses', 'min_order_amount', 'is_active', 'expires_at']);
+        AuditLogger::record('coupon.update', $coupon, before: $before, after: $after);
 
         return redirect()
             ->route('super-admin.coupons.index')
@@ -95,7 +105,13 @@ class CouponController extends Controller
 
     public function toggle(Coupon $coupon): RedirectResponse
     {
-        $coupon->update(['is_active' => ! $coupon->is_active]);
+        $before = $coupon->is_active;
+        $coupon->update(['is_active' => ! $before]);
+
+        AuditLogger::record('coupon.toggle', $coupon,
+            before: ['is_active' => $before],
+            after:  ['is_active' => $coupon->is_active],
+        );
 
         return back()->with('success', $coupon->is_active ? 'تم تفعيل الكوبون.' : 'تم إيقاف الكوبون.');
     }

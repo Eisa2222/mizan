@@ -4,6 +4,7 @@ namespace Modules\SuperAdmin\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Plan;
+use App\Services\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -26,6 +27,10 @@ class PlanController extends Controller
     {
         $plan = Plan::create($this->validated($request));
 
+        AuditLogger::record('plan.create', $plan,
+            after: ['name' => $plan->name, 'slug' => $plan->slug, 'price_monthly' => $plan->price_monthly],
+        );
+
         return redirect()
             ->route('super-admin.plans.index')
             ->with('success', "تم إنشاء الباقة «{$plan->name}».");
@@ -38,7 +43,12 @@ class PlanController extends Controller
 
     public function update(Request $request, Plan $plan): RedirectResponse
     {
+        $original = $plan->replicate();
         $plan->update($this->validated($request, $plan));
+
+        [$before, $after] = AuditLogger::diff($original, $plan,
+            ['name', 'price_monthly', 'price_yearly', 'is_active', 'max_users', 'max_storage_gb']);
+        AuditLogger::record('plan.update', $plan, before: $before, after: $after);
 
         return redirect()
             ->route('super-admin.plans.index')
@@ -47,7 +57,13 @@ class PlanController extends Controller
 
     public function toggle(Plan $plan): RedirectResponse
     {
-        $plan->update(['is_active' => ! $plan->is_active]);
+        $before = $plan->is_active;
+        $plan->update(['is_active' => ! $before]);
+
+        AuditLogger::record('plan.toggle', $plan,
+            before: ['is_active' => $before],
+            after:  ['is_active' => $plan->is_active],
+        );
 
         return back()->with('success', $plan->is_active ? 'تم تفعيل الباقة.' : 'تم إيقاف الباقة.');
     }
