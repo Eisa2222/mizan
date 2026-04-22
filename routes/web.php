@@ -268,6 +268,10 @@ Route::prefix('super-admin')->name('super-admin.')->group(function () {
         Route::get('/audit',        [\Modules\SuperAdmin\Http\Controllers\AuditController::class, 'index'])->name('audit.index');
         Route::get('/audit/export', [\Modules\SuperAdmin\Http\Controllers\AuditController::class, 'export'])->name('audit.export');
 
+        // Reports (revenue + churn over selectable periods)
+        Route::get('/reports',        [\Modules\SuperAdmin\Http\Controllers\ReportController::class, 'index'])->name('reports.index');
+        Route::get('/reports/export', [\Modules\SuperAdmin\Http\Controllers\ReportController::class, 'export'])->name('reports.export');
+
         // Coupons
         Route::get('/coupons',                  [CouponController::class, 'index'])->name('coupons.index');
         Route::get('/coupons/create',           [CouponController::class, 'create'])->name('coupons.create');
