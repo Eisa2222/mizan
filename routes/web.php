@@ -261,7 +261,12 @@ Route::prefix('super-admin')->name('super-admin.')->group(function () {
 
         // Payments
         Route::get('/payments',                  [SuperAdminPaymentController::class, 'index'])->name('payments.index');
+        Route::get('/payments/export',           [SuperAdminPaymentController::class, 'export'])->name('payments.export');
         Route::post('/payments/{payment}/refund', [SuperAdminPaymentController::class, 'refund'])->name('payments.refund');
+
+        // Audit log
+        Route::get('/audit',        [\Modules\SuperAdmin\Http\Controllers\AuditController::class, 'index'])->name('audit.index');
+        Route::get('/audit/export', [\Modules\SuperAdmin\Http\Controllers\AuditController::class, 'export'])->name('audit.export');
 
         // Coupons
         Route::get('/coupons',                  [CouponController::class, 'index'])->name('coupons.index');

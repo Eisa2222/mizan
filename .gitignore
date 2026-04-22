@@ -32,8 +32,10 @@ Thumbs.db
 /.claude/agents
 /.claude/worktrees
 
-# Runtime SQLite database (tests use a fresh one).
+# Runtime SQLite databases (tests + stancl-provisioned per-tenant DBs).
 /database/database.sqlite
+/database/tenant_*
+/database/*.sqlite-journal
 
 # Tesseract Arabic trained data is too large for git and not portable across
 # Tesseract versions — users download from tessdata_best during install.

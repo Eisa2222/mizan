@@ -4,7 +4,7 @@
 
 @section('content')
     <div class="sa-card" style="margin-bottom:16px">
-        <form method="GET" style="display:flex;gap:10px">
+        <form method="GET" style="display:flex;gap:10px;align-items:center">
             <select name="status" class="form-input" style="padding:8px 12px;border:1px solid #d4d9e3;border-radius:8px;font-family:inherit">
                 <option value="">كل الحالات</option>
                 @foreach (['initiated'=>'تم البدء','paid'=>'مدفوع','failed'=>'فشل','refunded'=>'مُسترجع'] as $k=>$v)
@@ -12,6 +12,7 @@
                 @endforeach
             </select>
             <button class="sa-btn">تصفية</button>
+            <a href="{{ route('super-admin.payments.export', $filters) }}" class="sa-btn sa-btn-ghost">⬇ CSV</a>
         </form>
     </div>
 

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\Tenant;
+use App\Services\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -52,24 +53,42 @@ class TenantController extends Controller
         ]);
     }
 
-    public function suspend(Tenant $tenant): RedirectResponse
+    public function suspend(Request $request, Tenant $tenant): RedirectResponse
     {
+        $before = ['status' => $tenant->status];
         $tenant->update(['status' => Tenant::STATUS_SUSPENDED]);
+
+        AuditLogger::record('tenant.suspend', $tenant,
+            before: $before,
+            after:  ['status' => Tenant::STATUS_SUSPENDED],
+            reason: $request->string('reason')->toString() ?: null,
+        );
 
         return back()->with('success', "تم تعليق المستأجر «{$tenant->company_name}».");
     }
 
     public function activate(Tenant $tenant): RedirectResponse
     {
+        $before = ['status' => $tenant->status];
         $tenant->update(['status' => Tenant::STATUS_ACTIVE]);
+
+        AuditLogger::record('tenant.activate', $tenant,
+            before: $before,
+            after:  ['status' => Tenant::STATUS_ACTIVE],
+        );
 
         return back()->with('success', "تم تفعيل المستأجر «{$tenant->company_name}».");
     }
 
     public function destroy(Tenant $tenant): RedirectResponse
     {
-        // stancl handles DeleteDatabase via the TenantDeleted event
-        // pipeline registered in TenancyServiceProvider.
+        // Log BEFORE the delete so the target_id still resolves in the
+        // audit row — stancl fires TenantDeleted pipeline async and the
+        // DB may disappear before the insert otherwise.
+        AuditLogger::record('tenant.delete', $tenant,
+            before: ['status' => $tenant->status, 'company_name' => $tenant->company_name],
+        );
+
         $name = $tenant->company_name;
         $tenant->delete();
 
@@ -100,7 +119,7 @@ class TenantController extends Controller
         }
 
         $cycle = $data['billing_cycle'];
-        Subscription::create([
+        $new = Subscription::create([
             'tenant_id'     => $tenant->id,
             'plan_id'       => $plan->id,
             'billing_cycle' => $cycle,
@@ -110,6 +129,11 @@ class TenantController extends Controller
             'amount'        => $plan->priceFor($cycle),
             'currency'      => $plan->currency,
         ]);
+
+        AuditLogger::record('tenant.change_plan', $tenant,
+            before: ['plan_id' => $current?->plan_id, 'subscription_id' => $current?->id],
+            after:  ['plan_id' => $plan->id, 'subscription_id' => $new->id, 'cycle' => $cycle],
+        );
 
         return back()->with('success', "تم تغيير الباقة إلى «{$plan->name}».");
     }
@@ -127,7 +151,14 @@ class TenantController extends Controller
             return back()->with('error', 'لا يوجد اشتراك نشط لهذا المستأجر.');
         }
 
+        $oldEndsAt = $sub->ends_at->copy();
         $sub->update(['ends_at' => $sub->ends_at->addDays($days)]);
+
+        AuditLogger::record('tenant.extend', $tenant,
+            before: ['ends_at' => $oldEndsAt->toIso8601String()],
+            after:  ['ends_at' => $sub->ends_at->toIso8601String()],
+            reason: "+{$days} يوم",
+        );
 
         return back()->with('success', "تم تمديد الاشتراك {$days} يوماً.");
     }
@@ -145,6 +176,10 @@ class TenantController extends Controller
         }
 
         $token = UserImpersonation::impersonate($tenant, $userId, '/');
+
+        AuditLogger::record('tenant.impersonate', $tenant,
+            after: ['user_id' => $userId, 'domain' => $domain->domain],
+        );
 
         $scheme = $request->secure() ? 'https' : 'http';
         $url    = "{$scheme}://{$domain->domain}/impersonate/" . $token->token;

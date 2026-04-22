@@ -100,6 +100,7 @@
             <a href="{{ route('super-admin.landing.faqs.index') }}" class="sa-navlink {{ request()->routeIs('super-admin.landing.faqs.*') ? 'active' : '' }}">❓ الأسئلة الشائعة</a>
 
             <div class="sa-nav-title">النظام</div>
+            <a href="{{ route('super-admin.audit.index') }}" class="sa-navlink {{ request()->routeIs('super-admin.audit.*') ? 'active' : '' }}">📋 سجل التدقيق</a>
             <a href="{{ route('super-admin.settings.index') }}" class="sa-navlink {{ request()->routeIs('super-admin.settings.*') ? 'active' : '' }}">⚙ الإعدادات</a>
         </aside>
 
